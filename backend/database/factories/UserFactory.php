@@ -1,11 +1,8 @@
 <?php
 
-declare(strict_types=1);
-
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
@@ -26,17 +23,14 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            'first_name' => fake()->firstName(),
-            'last_name' => fake()->lastName(),
+            'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
-            'username' => fake()->unique()->userName() . '_' . uniqid(),
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
+            'password' => static::$password ??= 'password',
             'remember_token' => Str::random(10),
-
-            // Create at and update_at would be random time between 1 year ago and now
-            'created_at' => $this->faker->dateTimeBetween('-1 year', 'now'),
-            'updated_at' => $this->faker->dateTimeBetween('-1 year', 'now'),
+            'two_factor_secret' => Str::random(10),
+            'two_factor_recovery_codes' => Str::random(10),
+            'two_factor_confirmed_at' => now(),
         ];
     }
 
@@ -47,6 +41,18 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Indicate that the model does not have two-factor authentication configured.
+     */
+    public function withoutTwoFactor(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
         ]);
     }
 }

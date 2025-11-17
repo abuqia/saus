@@ -12,12 +12,8 @@
 */
 
 pest()->extend(Tests\TestCase::class)
-    ->in(
-        'Feature',
-        'Smoke',
-        'Unit',
-        'Browser'
-    );
+    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->in('Feature');
 
 /*
 |--------------------------------------------------------------------------
@@ -31,7 +27,6 @@ pest()->extend(Tests\TestCase::class)
 */
 
 expect()->extend('toBeOne', function () {
-    // @phpstan-ignore-next-line
     return $this->toBe(1);
 });
 

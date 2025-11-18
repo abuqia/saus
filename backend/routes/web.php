@@ -16,4 +16,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard');
 });
 
+Route::middleware(['auth'])->group(function () {
+    Route::prefix('admin')->group(function () {
+        Route::get('/backups', [BackupController::class, 'index'])->name('backups.index');
+        Route::post('/backups/create', [BackupController::class, 'create'])->name('backups.create');
+        Route::get('/backups/download/{file_name}', [BackupController::class, 'download'])->name('backups.download');
+        Route::delete('/backups/delete/{file_name}', [BackupController::class, 'delete'])->name('backups.delete');
+    });
+});
+
 require __DIR__.'/settings.php';

@@ -38,6 +38,11 @@ return [
             'report' => false,
         ],
 
+        'backups' => [ // Disk khusus untuk backup
+            'driver' => 'local',
+            'root' => storage_path('app/backups'),
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

@@ -16,98 +16,124 @@ use Spatie\Permission\Models\Role;
 class UserController extends Controller
 {
     /**
-     * Display a listing of users.
+     * Display a listing of users
      */
     public function index(Request $request): Response
     {
         $this->authorize('users.view');
 
-        $query = User::query()->with('roles');
-
-        // Search
-        if ($request->has('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by type
-        if ($request->has('type') && $request->type !== 'all') {
-            $query->where('type', $request->type);
-        }
-
-        // Filter by status
-        if ($request->has('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-
-        // Filter by plan
-        if ($request->has('plan') && $request->plan !== 'all') {
-            $query->where('plan', $request->plan);
-        }
-
-        // Sort
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortDirection = $request->input('sort_direction', 'desc');
-        $query->orderBy($sortBy, $sortDirection);
-
-        $users = $query->paginate($request->input('per_page', 15))
+        $users = User::query()
+            ->with('roles')
+            ->withCount('ownedTenants')
+            ->when($request->search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->when($request->status && $request->status !== 'all', function ($query, $status) {
+                $query->where('status', $status);
+            })
+            ->when($request->type && $request->type !== 'all', function ($query, $type) {
+                $query->where('type', $type);
+            })
+            ->when($request->plan && $request->plan !== 'all', function ($query, $plan) {
+                $query->where('plan', $plan);
+            })
+            ->latest()
+            ->paginate($request->per_page ?? 15)
             ->withQueryString();
 
-        return Inertia::render('Admin/Users/Index', [
-            'users' => $users,
-            'filters' => $request->only(['search', 'type', 'status', 'plan', 'sort_by', 'sort_direction']),
-            'statistics' => [
-                'total' => User::count(),
-                'active' => User::where('status', 'active')->count(),
-                'super_admins' => User::where('type', 'super_admin')->count(),
-                'admins' => User::where('type', 'admin')->count(),
-                'users' => User::where('type', 'user')->count(),
+        $stats = [
+            'total' => User::count(),
+            'active' => User::where('status', 'active')->count(),
+            'verified' => User::whereNotNull('email_verified_at')->count(),
+            'super_admins' => User::where('type', 'super_admin')->count(),
+        ];
+
+        return Inertia::render('admin/users/index', [
+            'users' => $users->through(fn($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar_url' => $user->avatar_url,
+                'type' => $user->type,
+                'status' => $user->status,
+                'plan' => $user->plan,
+                'email_verified_at' => $user->email_verified_at?->format('M d, Y'),
+                'created_at' => $user->created_at?->format('M d, Y'),
+                'tenants_count' => $user->owned_tenants_count,
+                'roles' => $user->roles->map(fn($role) => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ]),
+            ]),
+            'stats' => $stats,
+            'filters' => $request->only(['search', 'status', 'type', 'plan', 'per_page']),
+            'can' => [
+                'create' => $request->user()->can('users.create'),
+                'edit' => $request->user()->can('users.edit'),
+                'delete' => $request->user()->can('users.delete'),
+                'impersonate' => $request->user()->can('users.impersonate'),
             ],
         ]);
     }
 
     /**
-     * Show the form for creating a new user.
+     * Show the form for creating a new user
      */
     public function create(): Response
     {
         $this->authorize('users.create');
 
-        return Inertia::render('Admin/Users/Create', [
-            'roles' => Role::all(['id', 'name']),
-            'types' => ['super_admin', 'admin', 'user'],
-            'statuses' => ['active', 'inactive', 'suspended', 'banned'],
+        $roles = Role::all()->map(fn($role) => [
+            'id' => $role->id,
+            'name' => $role->name,
+            'label' => ucwords(str_replace('_', ' ', $role->name)),
+        ]);
+
+        return Inertia::render('admin/users/create', [
+            'roles' => $roles,
             'plans' => ['free', 'starter', 'pro', 'enterprise'],
+            'types' => ['user', 'admin', 'super_admin'],
         ]);
     }
 
     /**
-     * Store a newly created user in storage.
+     * Store a newly created user
      */
     public function store(StoreUserRequest $request)
     {
-        $validated = $request->validated();
+        $this->authorize('users.create');
 
-        // Handle avatar upload
-        if ($request->hasFile('avatar')) {
-            $validated['avatar'] = $request->file('avatar')->store('avatars', 'public');
-        }
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => ['required', 'confirmed', Password::defaults()],
+            'type' => 'required|in:user,admin,super_admin',
+            'status' => 'required|in:active,inactive,suspended,banned',
+            'plan' => 'required|in:free,starter,pro,enterprise',
+            'roles' => 'nullable|array',
+            'roles.*' => 'exists:roles,id',
+            'email_verified' => 'boolean',
+        ]);
 
-        // Hash password
-        $validated['password'] = Hash::make($validated['password']);
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'type' => $validated['type'],
+            'status' => $validated['status'],
+            'plan' => $validated['plan'],
+            'email_verified_at' => $request->email_verified ? now() : null,
+        ]);
 
-        // Create user
-        $user = User::create($validated);
-
-        // Assign roles
-        if (isset($validated['roles'])) {
+        if (!empty($validated['roles'])) {
             $user->syncRoles($validated['roles']);
         }
 
-        return redirect()->route('admin.users.index')
+        return redirect()
+            ->route('admin.users.index')
             ->with('success', 'User created successfully.');
     }
 
@@ -132,85 +158,123 @@ class UserController extends Controller
     }
 
     /**
-     * Show the form for editing the specified user.
+     * Show the form for editing the specified user
      */
     public function edit(User $user): Response
     {
         $this->authorize('users.edit');
 
+        // Prevent editing super admin by non-super admin
+        if ($user->isSuperAdmin() && !auth()->user()->isSuperAdmin()) {
+            abort(403, 'You cannot edit a super admin user.');
+        }
+
         $user->load('roles');
 
-        return Inertia::render('Admin/Users/Edit', [
-            'user' => $user,
-            'roles' => Role::all(['id', 'name']),
-            'types' => ['super_admin', 'admin', 'user'],
-            'statuses' => ['active', 'inactive', 'suspended', 'banned'],
+        $roles = Role::all()->map(fn($role) => [
+            'id' => $role->id,
+            'name' => $role->name,
+            'label' => ucwords(str_replace('_', ' ', $role->name)),
+        ]);
+
+        return Inertia::render('admin/users/edit', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'type' => $user->type,
+                'status' => $user->status,
+                'plan' => $user->plan,
+                'phone' => $user->phone,
+                'bio' => $user->bio,
+                'timezone' => $user->timezone,
+                'language' => $user->language,
+                'email_verified_at' => $user->email_verified_at,
+                'roles' => $user->roles->pluck('id')->toArray(),
+            ],
+            'roles' => $roles,
             'plans' => ['free', 'starter', 'pro', 'enterprise'],
+            'types' => ['user', 'admin', 'super_admin'],
         ]);
     }
 
     /**
-     * Update the specified user in storage.
+     * Update the specified user
      */
     public function update(UpdateUserRequest $request, User $user)
     {
-        $validated = $request->validated();
+        $this->authorize('users.edit');
 
-        // Handle avatar upload
-        if ($request->hasFile('avatar')) {
-            // Delete old avatar
-            if ($user->avatar) {
-                Storage::disk('public')->delete($user->avatar);
-            }
-            $validated['avatar'] = $request->file('avatar')->store('avatars', 'public');
+        // Prevent editing super admin by non-super admin
+        if ($user->isSuperAdmin() && !auth()->user()->isSuperAdmin()) {
+            abort(403, 'You cannot edit a super admin user.');
         }
 
-        // Hash password if provided
-        if (isset($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'password' => ['nullable', 'confirmed', Password::defaults()],
+            'type' => 'required|in:user,admin,super_admin',
+            'status' => 'required|in:active,inactive,suspended,banned',
+            'plan' => 'required|in:free,starter,pro,enterprise',
+            'phone' => 'nullable|string|max:20',
+            'bio' => 'nullable|string|max:500',
+            'timezone' => 'nullable|string|max:50',
+            'language' => 'nullable|string|max:5',
+            'roles' => 'nullable|array',
+            'roles.*' => 'exists:roles,id',
+        ]);
+
+        $updateData = [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'type' => $validated['type'],
+            'status' => $validated['status'],
+            'plan' => $validated['plan'],
+            'phone' => $validated['phone'] ?? null,
+            'bio' => $validated['bio'] ?? null,
+            'timezone' => $validated['timezone'] ?? 'UTC',
+            'language' => $validated['language'] ?? 'en',
+        ];
+
+        if (!empty($validated['password'])) {
+            $updateData['password'] = Hash::make($validated['password']);
         }
 
-        // Update user
-        $user->update($validated);
+        $user->update($updateData);
 
-        // Sync roles
         if (isset($validated['roles'])) {
             $user->syncRoles($validated['roles']);
         }
 
-        return redirect()->route('admin.users.index')
+        return redirect()
+            ->route('admin.users.index')
             ->with('success', 'User updated successfully.');
     }
 
     /**
-     * Remove the specified user from storage.
+     * Remove the specified user
      */
     public function destroy(User $user)
     {
         $this->authorize('users.delete');
 
+        // Prevent deleting super admin
+        if ($user->isSuperAdmin()) {
+            abort(403, 'Cannot delete super admin user.');
+        }
+
         // Prevent deleting yourself
         if ($user->id === auth()->id()) {
-            return back()->with('error', 'You cannot delete your own account.');
+            return back()->with('error', 'You cannot delete yourself.');
         }
 
-        // Prevent deleting super admin
-        if ($user->isSuperAdmin() && !auth()->user()->isSuperAdmin()) {
-            return back()->with('error', 'You cannot delete a super admin.');
-        }
-
-        // Delete avatar
-        if ($user->avatar) {
-            Storage::disk('public')->delete($user->avatar);
-        }
-
-        // Delete user
         $user->delete();
 
-        return redirect()->route('admin.users.index')
+        return redirect()
+            ->route('admin.users.index')
             ->with('success', 'User deleted successfully.');
     }
-
     /**
      * Restore the specified soft deleted user.
      */
@@ -246,20 +310,80 @@ class UserController extends Controller
     }
 
     /**
+     * Bulk delete users
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $this->authorize('users.delete');
+
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:users,id',
+        ]);
+
+        $users = User::whereIn('id', $request->ids)
+            ->where('type', '!=', 'super_admin')
+            ->where('id', '!=', auth()->id())
+            ->get();
+
+        $deleted = $users->count();
+
+        foreach ($users as $user) {
+            $user->delete();
+        }
+
+        return redirect()
+            ->route('admin.users.index')
+            ->with('success', "{$deleted} user(s) deleted successfully.");
+    }
+
+    /**
+     * Verify user email
+     */
+    public function verifyEmail(User $user)
+    {
+        $this->authorize('users.edit');
+
+        $user->update([
+            'email_verified_at' => now(),
+        ]);
+
+        return back()->with('success', 'User email verified successfully.');
+    }
+
+    /**
+     * Change user status
+     */
+    public function changeStatus(Request $request, User $user)
+    {
+        $this->authorize('users.edit');
+
+        $request->validate([
+            'status' => 'required|in:active,inactive,suspended,banned',
+        ]);
+
+        $user->update([
+            'status' => $request->status,
+        ]);
+
+        return back()->with('success', 'User status changed successfully.');
+    }
+
+    /**
      * Impersonate user
      */
     public function impersonate(User $user)
     {
         $this->authorize('users.impersonate');
 
-        // Store original user ID
-        session(['impersonate_from' => auth()->id()]);
+        if ($user->isSuperAdmin()) {
+            abort(403, 'Cannot impersonate super admin user.');
+        }
 
-        // Login as target user
-        auth()->login($user);
+        session()->put('impersonating', $user->id);
+        session()->put('impersonator', auth()->id());
 
-        return redirect()->route('dashboard')
-            ->with('success', "You are now impersonating {$user->name}");
+        return redirect()->route('dashboard');
     }
 
     /**
@@ -267,12 +391,13 @@ class UserController extends Controller
      */
     public function stopImpersonating()
     {
-        $originalUserId = session('impersonate_from');
+        $impersonatingUserId = session('impersonating');
 
-        if ($originalUserId) {
-            $originalUser = User::findOrFail($originalUserId);
-            auth()->login($originalUser);
-            session()->forget('impersonate_from');
+        if ($impersonatingUserId) {
+            $impersonatingUser = User::findOrFail($impersonatingUserId);
+            auth()->login($impersonatingUser);
+            session()->forget('impersonating');
+            session()->forget('impersonator');
 
             return redirect()->route('admin.users.index')
                 ->with('success', 'Stopped impersonating user.');

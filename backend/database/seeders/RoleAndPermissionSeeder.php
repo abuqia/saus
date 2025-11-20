@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RoleAndPermissionSeeder extends Seeder
 {
@@ -22,7 +24,6 @@ class RoleAndPermissionSeeder extends Seeder
             'users.create',
             'users.edit',
             'users.delete',
-            'users.impersonate',
 
             // Role & Permission Management
             'roles.view',
@@ -98,20 +99,23 @@ class RoleAndPermissionSeeder extends Seeder
 
         // Create all permissions
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission]);
+            Permission::firstOrCreate([
+                'name' => $permission,
+                'guard_name' => 'web',
+            ]);
         }
 
         // ============================================
         // SUPER ADMIN ROLE
         // ============================================
-        $superAdmin = Role::create(['name' => 'super_admin']);
-        $superAdmin->givePermissionTo(Permission::all()); // All permissions
+        $superAdmin = Role::firstOrCreate(['name' => 'super_admin']);
+        $superAdmin->syncPermissions(Permission::all());
 
         // ============================================
         // ADMIN ROLE (Platform Admin)
         // ============================================
-        $admin = Role::create(['name' => 'admin']);
-        $admin->givePermissionTo([
+        $admin = Role::firstOrCreate(['name' => 'admin']);
+        $admin->syncPermissions([
             // Users
             'users.view',
             'users.create',
@@ -139,8 +143,8 @@ class RoleAndPermissionSeeder extends Seeder
         // ============================================
 
         // Tenant Owner (Full control of their tenant)
-        $tenantOwner = Role::create(['name' => 'tenant_owner']);
-        $tenantOwner->givePermissionTo([
+        $tenantOwner = Role::firstOrCreate(['name' => 'tenant_owner']);
+        $tenantOwner->syncPermissions([
             // Team
             'team.view',
             'team.invite',
@@ -197,8 +201,8 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Tenant Admin (Can manage content and team)
-        $tenantAdmin = Role::create(['name' => 'tenant_admin']);
-        $tenantAdmin->givePermissionTo([
+        $tenantAdmin = Role::firstOrCreate(['name' => 'tenant_admin']);
+        $tenantAdmin->syncPermissions([
             // Team
             'team.view',
             'team.invite',
@@ -241,8 +245,8 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Tenant Editor (Can create and edit content)
-        $tenantEditor = Role::create(['name' => 'tenant_editor']);
-        $tenantEditor->givePermissionTo([
+        $tenantEditor = Role::firstOrCreate(['name' => 'tenant_editor']);
+        $tenantEditor->syncPermissions([
             // Links
             'links.view',
             'links.create',
@@ -268,8 +272,8 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Tenant Viewer (Read-only access)
-        $tenantViewer = Role::create(['name' => 'tenant_viewer']);
-        $tenantViewer->givePermissionTo([
+        $tenantViewer = Role::firstOrCreate(['name' => 'tenant_viewer']);
+        $tenantViewer->syncPermissions([
             'links.view',
             'links.analytics',
             'pages.view',
@@ -281,8 +285,8 @@ class RoleAndPermissionSeeder extends Seeder
         // ============================================
         // USER ROLE (Regular registered user without tenant)
         // ============================================
-        $user = Role::create(['name' => 'user']);
-        $user->givePermissionTo([
+        $user = Role::firstOrCreate(['name' => 'user']);
+        $user->syncPermissions([
             'tenants.create', // Can create their first tenant
         ]);
 

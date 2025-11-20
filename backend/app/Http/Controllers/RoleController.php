@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRoleRequest;
@@ -30,7 +30,7 @@ class RoleController extends Controller
             ->paginate($request->per_page ?? 15)
             ->withQueryString();
 
-        return Inertia::render('admin/roles/index', [
+        return Inertia::render('roles/index', [
             'roles' => $roles,
             'filters' => $request->only(['search', 'per_page']),
             'can' => [
@@ -60,7 +60,7 @@ class RoleController extends Controller
             });
         });
 
-        return Inertia::render('admin/roles/create', [
+        return Inertia::render('roles/create', [
             'permissions' => $permissions,
         ]);
     }
@@ -80,7 +80,7 @@ class RoleController extends Controller
         }
 
         return redirect()
-            ->route('admin.roles.index')
+            ->route('roles.index')
             ->with('success', 'Role created successfully.');
     }
 
@@ -93,7 +93,7 @@ class RoleController extends Controller
 
         $role->load('permissions', 'users');
 
-        return Inertia::render('admin/roles/show', [
+        return Inertia::render('roles/show', [
             'role' => [
                 'id' => $role->id,
                 'name' => $role->name,
@@ -134,7 +134,7 @@ class RoleController extends Controller
             });
         });
 
-        return Inertia::render('admin/roles/edit', [
+        return Inertia::render('roles/edit', [
             'role' => [
                 'id' => $role->id,
                 'name' => $role->name,
@@ -161,7 +161,7 @@ class RoleController extends Controller
         $role->syncPermissions($request->permissions ?? []);
 
         return redirect()
-            ->route('admin.roles.index')
+            ->route('roles.index')
             ->with('success', 'Role updated successfully.');
     }
 
@@ -185,7 +185,7 @@ class RoleController extends Controller
         $role->delete();
 
         return redirect()
-            ->route('admin.roles.index')
+            ->route('roles.index')
             ->with('success', 'Role deleted successfully.');
     }
 
@@ -229,7 +229,7 @@ class RoleController extends Controller
         }
 
         return redirect()
-            ->route('admin.roles.index')
+            ->route('roles.index')
             ->with($deleted > 0 ? 'success' : 'error', $message);
     }
 }

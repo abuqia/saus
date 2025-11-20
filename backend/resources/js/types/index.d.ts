@@ -5,11 +5,12 @@ import { LucideIcon } from 'lucide-react';
 
 export interface Auth {
     user: User;
+    original_user?: User;
 }
 
 export interface BreadcrumbItem {
-    title: string;
-    href: string;
+    title?: string;
+    href?: string;
 }
 
 export interface NavGroup {
@@ -50,6 +51,8 @@ export interface User {
     created_at: string;
     roles?: Role[];
     permissions?: string[];
+    tenants_count?: number;
+    original_user_id?: number;
 }
 
 export interface Role {
@@ -175,10 +178,7 @@ export interface Setting {
     order: number;
 }
 
-export interface BreadcrumbItem {
-    label: string;
-    href?: string;
-}
+// (merged with the definition above)
 
 export interface PaginatedData<T> {
     data: T[];
@@ -211,6 +211,8 @@ export interface PageProps<T = Record<string, any>> {
     auth: {
         user: User;
     };
+    impersonating?: boolean;
+    original_user?: User;
     flash?: FlashMessage;
     errors?: Record<string, string>;
     ziggy?: any;
@@ -276,4 +278,28 @@ export interface FormField {
     required?: boolean;
     options?: SelectOption[];
     validation?: Record<string, any>;
+}
+
+// Admin Users Page Props
+export interface UsersPageProps {
+    users: {
+        data: User[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+    filters: {
+        search?: string;
+        status?: string;
+        type?: string;
+        sort_by: string;
+        sort_direction: string;
+    };
+    stats: {
+        total: number;
+        active: number;
+        admins: number;
+        verified: number;
+    };
 }

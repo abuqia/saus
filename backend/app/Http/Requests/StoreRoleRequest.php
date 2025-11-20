@@ -16,6 +16,8 @@ class StoreRoleRequest extends FormRequest
 
     /**
      * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -25,21 +27,27 @@ class StoreRoleRequest extends FormRequest
                 'string',
                 'max:255',
                 'unique:roles,name',
-                'regex:/^[a-z_]+$/', // Only lowercase and underscore
+                'regex:/^[a-z_]+$/', // Only lowercase letters and underscores
             ],
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,name',
+            'permissions' => [
+                'nullable',
+                'array',
+            ],
+            'permissions.*' => [
+                'exists:permissions,id',
+            ],
         ];
     }
 
     /**
-     * Get custom attributes for validator errors.
+     * Get custom attribute names for validator errors.
      */
     public function attributes(): array
     {
         return [
             'name' => 'role name',
             'permissions' => 'permissions',
+            'permissions.*' => 'permission',
         ];
     }
 
@@ -49,8 +57,10 @@ class StoreRoleRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.regex' => 'The role name must only contain lowercase letters and underscores.',
+            'name.required' => 'The role name is required.',
             'name.unique' => 'A role with this name already exists.',
+            'name.regex' => 'The role name must only contain lowercase letters and underscores.',
+            'permissions.*.exists' => 'One or more selected permissions are invalid.',
         ];
     }
 
@@ -59,10 +69,10 @@ class StoreRoleRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Convert name to lowercase with underscores
+        // Convert name to snake_case automatically
         if ($this->has('name')) {
             $this->merge([
-                'name' => strtolower(str_replace(' ', '_', $this->name)),
+                'name' => strtolower(str_replace([' ', '-'], '_', $this->name)),
             ]);
         }
     }

@@ -12,11 +12,18 @@ class UpdateRoleRequest extends FormRequest
      */
     public function authorize(): bool
     {
+        // Prevent updating system roles
+        if (in_array($this->route('role')->name, ['super_admin', 'admin'])) {
+            return false;
+        }
+
         return $this->user()->can('roles.edit');
     }
 
     /**
      * Get the validation rules that apply to the request.
+     *
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -28,21 +35,27 @@ class UpdateRoleRequest extends FormRequest
                 'string',
                 'max:255',
                 Rule::unique('roles', 'name')->ignore($roleId),
-                'regex:/^[a-z_]+$/', // Only lowercase and underscore
+                'regex:/^[a-z_]+$/', // Only lowercase letters and underscores
             ],
-            'permissions' => 'nullable|array',
-            'permissions.*' => 'exists:permissions,name',
+            'permissions' => [
+                'nullable',
+                'array',
+            ],
+            'permissions.*' => [
+                'exists:permissions,id',
+            ],
         ];
     }
 
     /**
-     * Get custom attributes for validator errors.
+     * Get custom attribute names for validator errors.
      */
     public function attributes(): array
     {
         return [
             'name' => 'role name',
             'permissions' => 'permissions',
+            'permissions.*' => 'permission',
         ];
     }
 
@@ -52,8 +65,10 @@ class UpdateRoleRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.regex' => 'The role name must only contain lowercase letters and underscores.',
+            'name.required' => 'The role name is required.',
             'name.unique' => 'A role with this name already exists.',
+            'name.regex' => 'The role name must only contain lowercase letters and underscores.',
+            'permissions.*.exists' => 'One or more selected permissions are invalid.',
         ];
     }
 
@@ -62,17 +77,21 @@ class UpdateRoleRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Prevent editing system roles
-        $role = $this->route('role');
-        if ($role && in_array($role->name, ['super_admin', 'admin'])) {
-            abort(403, 'Cannot edit system roles.');
-        }
-
-        // Convert name to lowercase with underscores
+        // Convert name to snake_case automatically
         if ($this->has('name')) {
             $this->merge([
-                'name' => strtolower(str_replace(' ', '_', $this->name)),
+                'name' => strtolower(str_replace([' ', '-'], '_', $this->name)),
             ]);
         }
+    }
+
+    /**
+     * Handle a failed authorization attempt.
+     */
+    protected function failedAuthorization(): void
+    {
+        throw new \Illuminate\Auth\Access\AuthorizationException(
+            'You cannot edit system roles.'
+        );
     }
 }

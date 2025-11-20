@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -75,7 +75,7 @@ class PermissionController extends Controller
             'modules' => $modules->count(),
         ];
 
-        return Inertia::render('admin/permissions/index', [
+        return Inertia::render('permissions/index', [
             'groupedPermissions' => $groupedPermissions,
             'filters' => [
                 'search' => $filters['search'] ?? null,
@@ -98,7 +98,7 @@ class PermissionController extends Controller
             ->filter()
             ->values();
 
-        return Inertia::render('admin/permissions/create', [
+        return Inertia::render('permissions/create', [
             'modules' => $modules,
         ]);
     }
@@ -121,7 +121,7 @@ class PermissionController extends Controller
             ->log('Permission created');
 
         return redirect()
-            ->route('admin.permissions.index')
+            ->route('permissions.index')
             ->with('success', 'Permission created successfully');
     }
 
@@ -132,7 +132,7 @@ class PermissionController extends Controller
     {
         $permission->load(['roles', 'users']);
 
-        return Inertia::render('admin/permissions/show', [
+        return Inertia::render('permissions/show', [
             'permission' => $permission,
         ]);
     }
@@ -149,7 +149,7 @@ class PermissionController extends Controller
             ->filter()
             ->values();
 
-        return Inertia::render('admin/permissions/edit', [
+        return Inertia::render('permissions/edit', [
             'permission' => $permission,
             'modules' => $modules,
         ]);
@@ -173,7 +173,7 @@ class PermissionController extends Controller
             ->log('Permission updated');
 
         return redirect()
-            ->route('admin.permissions.index')
+            ->route('permissions.index')
             ->with('success', 'Permission updated successfully');
     }
 
@@ -194,7 +194,7 @@ class PermissionController extends Controller
             ->log('Permission deleted');
 
         return redirect()
-            ->route('admin.permissions.index')
+            ->route('permissions.index')
             ->with('success', 'Permission deleted successfully');
     }
 }

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tenant extends Model
@@ -11,6 +13,7 @@ class Tenant extends Model
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'name',
         'slug',
         'domain',
@@ -27,6 +30,18 @@ class Tenant extends Model
     public function settings(): HasMany
     {
         return $this->hasMany(TenantSetting::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)
+            ->withPivot(['role', 'permissions', 'status', 'invitation_token', 'invitation_sent_at', 'invitation_accepted_at'])
+            ->withTimestamps();
     }
 
     public function scopeActive($query)

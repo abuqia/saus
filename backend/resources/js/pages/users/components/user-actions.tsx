@@ -8,7 +8,18 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Link, router, usePage } from "@inertiajs/react"
-import { MoreVertical, Edit, Trash, Ban, CheckCircle, Eye, Mail, Key } from "lucide-react"
+import {
+    MoreVertical,
+    Edit,
+    Trash,
+    Ban,
+    CheckCircle,
+    Eye,
+    Mail,
+    Key,
+    User as UserIcon,
+    LogOut,
+} from "lucide-react"
 import { useState } from "react"
 import type { User as UserType, PageProps } from "@/types"
 import {
@@ -31,13 +42,15 @@ interface UserActionsProps {
 export function UserActions({ user, onStatusChange }: UserActionsProps) {
     const { props } = usePage<PageProps>()
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [impersonateDialogOpen, setImpersonateDialogOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
 
-    // Get current user from page props (lebih reliable)
     const currentUser = props.auth.user
     const isCurrentUser = user.id === currentUser.id
     const isSuperAdmin = user.type === 'super_admin'
     const canDelete = !isSuperAdmin && !isCurrentUser
+    const canImpersonate = !isCurrentUser && user.status === 'active' && !isSuperAdmin
+    const isImpersonating = props.impersonating || false
 
     const handleDelete = async () => {
         setIsLoading(true)
@@ -76,6 +89,14 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
         router.visit(`/users/${user.id}/reset-password`)
     }
 
+    const handleImpersonate = () => {
+        // Gunakan window.location untuk redirect yang lebih reliable
+        window.location.href = `/users/${user.id}/impersonate`
+    }
+
+    const stopImpersonating = () => {
+        window.location.href = '/users/stop-impersonate'
+    }
 
     return (
         <>
@@ -116,10 +137,31 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
 
                     <DropdownMenuSeparator />
 
-                    
+                    {/* Impersonate Action */}
+                    {canImpersonate && (
+                        <DropdownMenuItem
+                            onClick={() => setImpersonateDialogOpen(true)}
+                            className="cursor-pointer flex items-center text-blue-600"
+                        >
+                            <UserIcon className="mr-2 h-4 w-4" />
+                            Impersonate User
+                        </DropdownMenuItem>
+                    )}
+
+                    {/* Stop Impersonating */}
+                    {isImpersonating && (
+                        <DropdownMenuItem
+                            onClick={stopImpersonating}
+                            className="cursor-pointer flex items-center text-orange-600"
+                        >
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Stop Impersonating
+                        </DropdownMenuItem>
+                    )}
 
                     <DropdownMenuSeparator />
 
+                    {/* Status Actions */}
                     {user.status === 'active' && !isCurrentUser && (
                         <DropdownMenuItem
                             onClick={() => handleStatusUpdate('suspended')}
@@ -140,6 +182,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                         </DropdownMenuItem>
                     )}
 
+                    {/* Delete Action */}
                     {canDelete && (
                         <>
                             <DropdownMenuSeparator />
@@ -153,6 +196,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                         </>
                     )}
 
+                    {/* Information Messages */}
                     {isCurrentUser && (
                         <>
                             <DropdownMenuSeparator />
@@ -166,7 +210,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                         <>
                             <DropdownMenuSeparator />
                             <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                                Super admin users cannot be deleted
+                                Super admin users cannot be impersonated or deleted
                             </div>
                         </>
                     )}
@@ -196,7 +240,33 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                 </AlertDialogContent>
             </AlertDialog>
 
-            
+            {/* Impersonate Confirmation Dialog */}
+            <AlertDialog open={impersonateDialogOpen} onOpenChange={setImpersonateDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Impersonate User</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            You are about to impersonate <strong>{user.name}</strong>.
+                            <br /><br />
+                            While impersonating:<br />
+                            <span>- You will see the application as this user</span><br />
+                            <span>- All actions will be performed as this user</span><br />
+                            <span>- You can stop impersonating at any time</span><br />
+                            <span>- This action will be logged for security purposes</span>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleImpersonate}
+                            disabled={isLoading}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            Impersonate User
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }

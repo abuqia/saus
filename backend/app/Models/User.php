@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Lab404\Impersonate\Models\Impersonate;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -17,7 +18,7 @@ use Spatie\Activitylog\LogOptions;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, SoftDeletes, HasRoles, LogsActivity;
+    use HasFactory, Notifiable, HasApiTokens, SoftDeletes, HasRoles, LogsActivity, Impersonate;
 
     /**
      * The attributes that are mass assignable.
@@ -229,5 +230,28 @@ class User extends Authenticatable implements MustVerifyEmail
             'last_login_ip' => $ip ?? request()->ip(),
             'failed_login_attempts' => 0,
         ]);
+    }
+
+    /**
+     * Determine if the user can impersonate other users
+     */
+    public function canImpersonate(): bool
+    {
+        // Hanya admin dan super admin yang bisa impersonate
+        return in_array($this->type, ['super_admin', 'admin']);
+    }
+
+    /**
+     * Determine if the user can be impersonated
+     */
+    public function canBeImpersonated(): bool
+    {
+        // User tidak bisa di-impersonate jika:
+        // 1. Dia super admin
+        // 2. Status tidak active
+        // 3. Sedang di-impersonate
+        return $this->type !== 'super_admin' &&
+               $this->status === 'active' &&
+               !$this->isImpersonated();
     }
 }

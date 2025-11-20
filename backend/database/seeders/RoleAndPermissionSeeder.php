@@ -24,6 +24,7 @@ class RoleAndPermissionSeeder extends Seeder
             'users.create',
             'users.edit',
             'users.delete',
+            'users.impersonate',
 
             // Role & Permission Management
             'roles.view',

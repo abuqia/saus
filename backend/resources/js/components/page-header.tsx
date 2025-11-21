@@ -24,7 +24,7 @@ export function PageHeader({
                 <div className="space-y-1">
                     <div className="flex items-center gap-3">
                         {Icon && (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/20">
                                 <Icon className="h-5 w-5 text-primary" />
                             </div>
                         )}
@@ -66,15 +66,15 @@ export function StatsCard({
         <div className={cn("rounded-lg border bg-card p-6 shadow-sm", className)}>
             <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                    <p className="text-2xl font-bold">{value}</p>
+                    <p className="text-sm font-medium text-white dark:text-white">{title}</p>
+                    <p className="text-2xl font-bold text-foreground dark:text-foreground">{value}</p>
                     {description && (
-                        <p className="text-xs text-muted-foreground">{description}</p>
+                        <p className="text-xs text-white dark:text-white">{description}</p>
                     )}
                 </div>
                 {Icon && (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                        <Icon className="h-6 w-6 text-primary" />
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+                        <Icon className="h-6 w-6 text-primary dark:text-primary" />
                     </div>
                 )}
             </div>

@@ -2,6 +2,7 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 import { NavUser } from './nav-user';
+import { ModeToggle } from './mode-toggle';
 
 export function AppSidebarHeader({
     breadcrumbs = [],
@@ -16,6 +17,7 @@ export function AppSidebarHeader({
                     <Breadcrumbs breadcrumbs={breadcrumbs} />
                 </div>
                 <div className="flex items-center gap-2">
+                    <ModeToggle />
                     <NavUser />
                 </div>
             </div>

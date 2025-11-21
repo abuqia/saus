@@ -24,8 +24,8 @@ class DatabaseSeeder extends Seeder
             RoleAndPermissionSeeder::class,
             DemoUsersSeeder::class,
             TenantsSeeder::class,
-            SettingsSeeder::class,
-            ThemesSeeder::class,
+            // SettingsSeeder::class,
+            // ThemesSeeder::class,
         ]);
     }
 }

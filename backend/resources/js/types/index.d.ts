@@ -48,9 +48,13 @@ export interface User {
     timezone: string;
     language: string;
     two_factor_enabled: boolean;
+    last_login_at?: string;
+    last_login_ip?: string;
     created_at: string;
     roles?: Role[];
     permissions?: string[];
+    owned_tenants?: Tenant[];
+    member_tenants?: Tenant[];
     tenants_count?: number;
     original_user_id?: number;
 }

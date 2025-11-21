@@ -26,7 +26,7 @@ export function DataTableSkeleton({
             </div>
 
             {/* Table Skeleton */}
-            <div className="rounded-md border">
+            <div className="rounded-md border bg-card shadow-sm">
                 <Table>
                     <TableHeader>
                         <TableRow>

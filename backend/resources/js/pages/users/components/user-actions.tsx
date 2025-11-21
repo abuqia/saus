@@ -73,13 +73,32 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
         }
     }
 
-    const handleStatusUpdate = async (status: string) => {
+    const handleStatusUpdate = async (userId: number, status: string) => {
         try {
-            await onStatusChange(user.id, status)
+            const response = await fetch(`/users/${userId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ status }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                await onStatusChange(userId, status)
+                toast.success(result.message);
+                // Trigger datatable reload
+                router.reload({ only: ['users'] });
+            } else {
+                toast.error(result.message || 'Failed to update user status');
+            }
         } catch {
-            toast.error("Failed to update user status")
+            toast.error('An error occurred while updating user status');
         }
-    }
+    };
 
     const handleSendEmail = () => {
         router.visit(`/users/${user.id}/email`)
@@ -164,7 +183,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                     {/* Status Actions */}
                     {user.status === 'active' && !isCurrentUser && (
                         <DropdownMenuItem
-                            onClick={() => handleStatusUpdate('suspended')}
+                            onClick={() => handleStatusUpdate(user.id, 'suspended')}
                             className="cursor-pointer flex items-center text-orange-600"
                         >
                             <Ban className="mr-2 h-4 w-4" />
@@ -174,7 +193,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
 
                     {(user.status === 'suspended' || user.status === 'inactive') && !isCurrentUser && (
                         <DropdownMenuItem
-                            onClick={() => handleStatusUpdate('active')}
+                            onClick={() => handleStatusUpdate(user.id, 'active')}
                             className="cursor-pointer flex items-center text-green-600"
                         >
                             <CheckCircle className="mr-2 h-4 w-4" />
@@ -247,12 +266,15 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                         <AlertDialogTitle>Impersonate User</AlertDialogTitle>
                         <AlertDialogDescription>
                             You are about to impersonate <strong>{user.name}</strong>.
-                            <br /><br />
-                            While impersonating:<br />
-                            <span>- You will see the application as this user</span><br />
-                            <span>- All actions will be performed as this user</span><br />
-                            <span>- You can stop impersonating at any time</span><br />
-                            <span>- This action will be logged for security purposes</span>
+                            <br />
+                            <br />
+                            While impersonating:
+                            <ul className="list-inside list-disc text-sm">
+                                <li>You will see the application as this user</li>
+                                <li>All actions will be performed as this user</li>
+                                <li>You can stop impersonating at any time</li>
+                                <li>This action will be logged for security purposes</li>
+                            </ul>
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

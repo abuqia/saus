@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -279,7 +280,7 @@ class UserController extends Controller
     /**
      * Update user status.
      */
-    public function updateStatus(Request $request, User $user): RedirectResponse
+    public function updateStatus(Request $request, User $user): JsonResponse
     {
         $validated = $request->validate([
             'status' => ['required', 'in:active,inactive,suspended,banned'],
@@ -287,8 +288,15 @@ class UserController extends Controller
 
         $user->update(['status' => $validated['status']]);
 
-        return redirect()->back()
-            ->with('success', 'User status updated successfully.');
+        // Return JSON response for Inertia to handle reload
+        return response()->json([
+            'success' => true,
+            'message' => 'User status updated successfully.',
+            'user' => [
+                'id' => $user->id,
+                'status' => $user->status,
+            ]
+        ]);
     }
 
     /**

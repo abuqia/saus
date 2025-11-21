@@ -15,28 +15,34 @@ class TenantsSeeder extends Seeder
             [
                 'name' => 'Acme Inc',
                 'domain' => 'acme.test',
-                'owner_email' => 'owner@example.com',
+                'owner_email' => 'owner@acme.test',
                 'members' => [
-                    ['email' => 'manager@example.com', 'role' => 'admin'],
-                    ['email' => 'editor@example.com', 'role' => 'editor'],
-                    ['email' => 'viewer@example.com', 'role' => 'viewer'],
+                    ['email' => 'manager@acme.test', 'role' => 'admin'],
+                    ['email' => 'editor@acme.test', 'role' => 'editor'],
+                    ['email' => 'viewer@acme.test', 'role' => 'viewer'],
                 ],
             ],
             [
                 'name' => 'Globex LLC',
                 'domain' => 'globex.test',
-                'owner_email' => 'owner@example.com',
+                'owner_email' => 'owner@globex.test',
                 'members' => [
-                    ['email' => 'editor@example.com', 'role' => 'editor'],
+                    ['email' => 'editor@globex.test', 'role' => 'editor'],
                 ],
             ],
         ];
 
         foreach ($definitions as $def) {
-            $owner = User::where('email', $def['owner_email'])->first();
-            if (!$owner) {
-                continue;
-            }
+            $owner = User::firstOrCreate(
+                ['email' => $def['owner_email']],
+                [
+                    'name' => $def['name'] . ' Owner',
+                    'password' => '12345678',
+                    'type' => 'user',
+                    'status' => 'active',
+                    'email_verified_at' => now(),
+                ]
+            );
 
             $tenant = Tenant::firstOrCreate(
                 ['slug' => Str::slug($def['name'])],
@@ -49,10 +55,17 @@ class TenantsSeeder extends Seeder
             );
 
             foreach ($def['members'] as $memberDef) {
-                $member = User::where('email', $memberDef['email'])->first();
-                if (!$member) {
-                    continue;
-                }
+                $member = User::firstOrCreate(
+                    ['email' => $memberDef['email']],
+                    [
+                        'name' => ucfirst(explode('@', $memberDef['email'])[0]),
+                        'password' => '12345678',
+                        'type' => 'user',
+                        'status' => 'active',
+                        'email_verified_at' => now(),
+                    ]
+                );
+
                 $tenant->users()->syncWithPivotValues($member->id, [
                     'role' => $memberDef['role'],
                     'status' => 'active',

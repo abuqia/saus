@@ -8,20 +8,27 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Filter, X } from "lucide-react"
-import { router } from "@inertiajs/react"
 import { useState, useEffect } from "react"
 
 interface UserFiltersProps {
     currentFilters: {
+        search?: string
         status?: string
         type?: string
         plan?: string
         sort_by?: string
         sort_direction?: string
     }
+    onChange?: (filters: {
+        status?: string
+        type?: string
+        plan?: string
+        sort_by?: string
+        sort_direction?: string
+    }) => void
 }
 
-export function UserFilters({ currentFilters }: UserFiltersProps) {
+export function UserFilters({ currentFilters, onChange }: UserFiltersProps) {
     const [filters, setFilters] = useState({
         status: currentFilters.status || '',
         type: currentFilters.type || '',
@@ -45,12 +52,7 @@ export function UserFilters({ currentFilters }: UserFiltersProps) {
         const normalized = value === 'all' ? '' : value
         const newFilters = { ...filters, [key]: normalized }
         setFilters(newFilters)
-
-        // Apply filter immediately
-        router.get('/users', newFilters, {
-            preserveState: true,
-            replace: true,
-        })
+        onChange?.(newFilters)
     }
 
     const clearFilters = () => {
@@ -62,10 +64,7 @@ export function UserFilters({ currentFilters }: UserFiltersProps) {
             sort_direction: 'desc',
         }
         setFilters(resetFilters)
-        router.get('/users', resetFilters, {
-            preserveState: true,
-            replace: true,
-        })
+        onChange?.(resetFilters)
     }
 
     const hasActiveFilters = filters.status || filters.type || filters.plan

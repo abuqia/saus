@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateUserRequest extends FormRequest
 {
@@ -34,7 +35,7 @@ class UpdateUserRequest extends FormRequest
             'timezone' => ['nullable', 'string', 'timezone'],
             'language' => ['nullable', 'string', 'max:2'],
             'roles' => ['nullable', 'array'],
-            'roles.*' => ['exists:roles,name'],
+            'roles.*' => ['exists:roles,id'],
             'avatar' => ['nullable', 'image', 'max:2048'],
         ];
     }

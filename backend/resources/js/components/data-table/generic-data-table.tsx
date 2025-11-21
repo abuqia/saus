@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react-hooks/incompatible-library */
+import * as React from "react"
 import {
     ColumnDef,
     flexRender,
@@ -23,6 +25,8 @@ interface GenericDataTableProps<TData, TValue> {
     data: TData[]
     searchKey?: string
     searchPlaceholder?: string
+    onSearch?: (value: string) => void
+    searchValue?: string
     filters?: React.ReactNode
     isLoading?: boolean
     pagination?: {
@@ -31,9 +35,19 @@ interface GenericDataTableProps<TData, TValue> {
         perPage: number
         total: number
         onPageChange: (page: number) => void
+        onPerPageChange?: (perPage: number) => void
     }
     onRowClick?: (row: TData) => void
     className?: string
+    clientSide?: boolean
+    initialPerPage?: number
+    clientFilters?: {
+        status?: string
+        type?: string
+        plan?: string
+        sort_by?: string
+        sort_direction?: string
+    }
 }
 
 export function GenericDataTable<TData, TValue>({
@@ -41,14 +55,78 @@ export function GenericDataTable<TData, TValue>({
     data,
     searchKey,
     searchPlaceholder = "Search...",
+    onSearch,
+    searchValue,
     filters,
     isLoading = false,
     pagination,
     onRowClick,
     className,
+    clientSide,
+    initialPerPage = 15,
+    clientFilters,
 }: GenericDataTableProps<TData, TValue>) {
+    const normalizedSearch = (searchValue || '').toLowerCase().trim()
+    let workingData: any[] = Array.isArray(data) ? [...data] : []
+
+    if (clientSide) {
+        if (normalizedSearch && searchKey) {
+            workingData = workingData.filter((row: any) => {
+                const primary = String(row?.[searchKey] ?? '').toLowerCase()
+                const emailValue = String(row?.email ?? '').toLowerCase()
+                return primary.includes(normalizedSearch) || emailValue.includes(normalizedSearch)
+            })
+        }
+
+        if (clientFilters?.status) {
+            workingData = workingData.filter((row: any) => String(row?.status) === clientFilters.status)
+        }
+        if (clientFilters?.type) {
+            workingData = workingData.filter((row: any) => String(row?.type) === clientFilters.type)
+        }
+        if (clientFilters?.plan) {
+            workingData = workingData.filter((row: any) => String(row?.plan) === clientFilters.plan)
+        }
+
+        if (clientFilters?.sort_by) {
+            const key = clientFilters.sort_by
+            const dir = (clientFilters.sort_direction || 'desc') === 'asc' ? 1 : -1
+            workingData.sort((a: any, b: any) => {
+                const va = a?.[key]
+                const vb = b?.[key]
+                if (va == null && vb == null) return 0
+                if (va == null) return 1
+                if (vb == null) return -1
+                const isDateKey = key === 'created_at' || key === 'last_login_at'
+                const aa = isDateKey ? new Date(va).getTime() : String(va).toLowerCase()
+                const bb = isDateKey ? new Date(vb).getTime() : String(vb).toLowerCase()
+                if (aa < bb) return -1 * dir
+                if (aa > bb) return 1 * dir
+                return 0
+            })
+        }
+    }
+
+    let page = 1
+    let perPage = initialPerPage
+    let total = workingData.length
+    let lastPage = Math.max(1, Math.ceil(total / perPage))
+    let pagedData = workingData.slice((page - 1) * perPage, page * perPage)
+
+    const [statePage, setStatePage] = React.useState(page)
+    const [statePerPage, setStatePerPage] = React.useState(perPage)
+
+    if (clientSide) {
+        page = statePage
+        perPage = statePerPage
+        total = workingData.length
+        lastPage = Math.max(1, Math.ceil(total / perPage))
+        if (page > lastPage) page = lastPage
+        pagedData = workingData.slice((page - 1) * perPage, page * perPage)
+    }
+
     const table = useReactTable({
-        data,
+        data: clientSide ? pagedData : workingData,
         columns,
         getCoreRowModel: getCoreRowModel(),
         manualPagination: true,
@@ -59,12 +137,14 @@ export function GenericDataTable<TData, TValue>({
     }
 
     return (
-        <div className={cn("space-y-4", className)}>
+        <div className={cn("space-y-4 bg-card rounded-lg border shadow-sm", className)}>
             {/* Toolbar dengan search dan filters */}
             {(searchKey || filters) && (
                 <DataTableToolbar
                     searchKey={searchKey}
                     searchPlaceholder={searchPlaceholder}
+                    value={searchValue}
+                    onSearch={onSearch}
                     filters={filters}
                 />
             )}
@@ -126,13 +206,23 @@ export function GenericDataTable<TData, TValue>({
             </div>
 
             {/* Pagination */}
-            {pagination && (
+            {clientSide ? (
+                <DataTablePagination
+                    currentPage={page}
+                    lastPage={lastPage}
+                    perPage={perPage}
+                    total={total}
+                    onPageChange={(p) => setStatePage(Math.max(1, Math.min(p, lastPage)))}
+                    onPerPageChange={(pp) => { setStatePerPage(pp); setStatePage(1); }}
+                />
+            ) : pagination && (
                 <DataTablePagination
                     currentPage={pagination.currentPage}
                     lastPage={pagination.lastPage}
                     perPage={pagination.perPage}
                     total={pagination.total}
                     onPageChange={pagination.onPageChange}
+                    onPerPageChange={pagination.onPerPageChange}
                 />
             )}
         </div>

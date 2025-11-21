@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader, StatsCard } from '@/components/page-header';
@@ -22,7 +23,7 @@ import {
     UserPlus,
     UserCog,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { BreadcrumbItem, User, UsersPageProps } from '@/types';
 import { toast } from 'sonner';
 import { dashboard } from '@/routes';
@@ -31,22 +32,24 @@ import UserController from '@/actions/App/Http/Controllers/UserController';
 export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
+    const [clientFilters, setClientFilters] = useState({
+        status: filters.status || '',
+        type: filters.type || '',
+        plan: (filters as any).plan || '',
+        sort_by: filters.sort_by || 'created_at',
+        sort_direction: filters.sort_direction || 'desc',
+    });
 
     const handlePageChange = (page: number) => {
-        setIsLoading(true);
-        router.get(UserController.index().url, { page, search: searchTerm, ...filters }, {
-            preserveState: true,
-            onFinish: () => setIsLoading(false),
-        });
+        // client-side pagination handled in table
     };
 
     const handleSearch = (search: string) => {
         setSearchTerm(search);
-        router.get(UserController.index().url, { search, ...filters }, {
-            preserveState: true,
-            replace: true,
-        });
     };
+
+    useEffect(() => {
+    }, [searchTerm]);
 
     const handleStatusChange = async (userId: number, status: string) => {
         try {
@@ -247,47 +250,45 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                         value={stats.total.toLocaleString()}
                         icon={UsersIcon}
                         description="All registered users"
-                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
+                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:bg-gradient-to-br dark:from-blue-800 dark:to-blue-900 dark:border-blue-800"
                     />
                     <StatsCard
                         title="Active Users"
                         value={stats.active.toLocaleString()}
                         icon={CheckCircle}
                         description="Currently active"
-                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:bg-gradient-to-br dark:from-green-800 dark:to-green-900 dark:border-green-800"
                     />
                     <StatsCard
                         title="Administrators"
                         value={stats.admins.toLocaleString()}
                         icon={UserCog}
                         description="Admin & Super Admin"
-                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:bg-gradient-to-br dark:from-purple-800 dark:to-purple-900 dark:border-purple-800"
                     />
                     <StatsCard
                         title="Verified"
                         value={stats.verified.toLocaleString()}
                         icon={ShieldCheck}
                         description="Email verified users"
-                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
+                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:bg-gradient-to-br dark:from-orange-800 dark:to-orange-900 dark:border-orange-800"
                     />
                 </div>
 
                 {/* Data Table Section */}
-                <div className="bg-white rounded-lg border shadow-sm">
+                <div className="bg-card rounded-lg border shadow-sm">
                     <GenericDataTable
                         columns={columns}
                         data={users.data}
                         searchKey="name"
                         searchPlaceholder="Search users by name, email..."
-                        filters={<UserFilters currentFilters={filters} />}
+                        onSearch={handleSearch}
+                        searchValue={searchTerm}
+                        filters={<UserFilters currentFilters={clientFilters} onChange={(f) => setClientFilters(prev => ({ ...prev, ...f }))} />}
                         isLoading={isLoading}
-                        pagination={{
-                            currentPage: users.current_page,
-                            lastPage: users.last_page,
-                            perPage: users.per_page,
-                            total: users.total,
-                            onPageChange: handlePageChange,
-                        }}
+                        clientSide
+                        initialPerPage={users.per_page}
+                        clientFilters={clientFilters}
                         onRowClick={(user) => router.visit(`/users/${user.id}`)}
                         className="p-6"
                     />

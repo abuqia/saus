@@ -37,7 +37,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('users/{user}/verify-email', [UserController::class, 'verifyEmail'])->name('users.verify-email');
     Route::get('/users/{user}/email', [UserController::class, 'email'])->name('users.email');
     Route::get('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
-    Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+    Route::post('/users/{user}/reset-password', [UserController::class, 'processResetPassword'])->name('users.reset-password.update');
     Route::post('users/{user}/change-status', [UserController::class, 'changeStatus'])->name('users.change-status');
 
     // ============================================

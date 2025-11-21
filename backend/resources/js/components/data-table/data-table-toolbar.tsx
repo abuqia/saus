@@ -4,6 +4,7 @@ import { Search } from "lucide-react"
 interface DataTableToolbarProps {
     searchKey?: string
     searchPlaceholder?: string
+    value?: string
     filters?: React.ReactNode
     onSearch?: (value: string) => void
 }
@@ -11,6 +12,7 @@ interface DataTableToolbarProps {
 export function DataTableToolbar({
     searchKey,
     searchPlaceholder = "Search...",
+    value,
     filters,
     onSearch,
 }: DataTableToolbarProps) {
@@ -22,6 +24,7 @@ export function DataTableToolbar({
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder={searchPlaceholder}
+                        value={value}
                         onChange={(e) => onSearch?.(e.target.value)}
                         className="pl-9"
                     />

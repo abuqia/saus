@@ -66,10 +66,10 @@ export function StatsCard({
         <div className={cn("rounded-lg border bg-card p-6 shadow-sm", className)}>
             <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                    <p className="text-sm font-medium text-white dark:text-white">{title}</p>
+                    <p className="text-sm font-medium text-muted-foreground dark:text-white">{title}</p>
                     <p className="text-2xl font-bold text-foreground dark:text-foreground">{value}</p>
                     {description && (
-                        <p className="text-xs text-white dark:text-white">{description}</p>
+                        <p className="text-xs text-muted-foreground dark:text-white">{description}</p>
                     )}
                 </div>
                 {Icon && (

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Mail\UserNotificationMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
@@ -21,7 +23,7 @@ class UserController extends Controller
         $this->middleware(['auth', 'verified']);
         $this->middleware('can:users.view')->only(['index', 'show']);
         $this->middleware('can:users.create')->only(['create', 'store']);
-        $this->middleware('can:users.edit')->only(['edit', 'update', 'updateStatus']);
+        $this->middleware('can:users.edit')->only(['edit', 'update', 'updateStatus', 'verifyEmail']);
         $this->middleware('can:users.delete')->only(['destroy', 'bulkDestroy']);
     }
 
@@ -72,7 +74,7 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'avatar_url' => $user->avatar_url,
+                'avatar' => $user->avatar,
                 'type' => $user->type,
                 'status' => $user->status,
                 'plan' => $user->plan,
@@ -144,8 +146,11 @@ class UserController extends Controller
             'type' => $validated['type'],
             'status' => $validated['status'],
             'plan' => $validated['plan'],
-            'email_verified_at' => now(), // Auto-verify admin created users
         ]);
+
+        if (!$user->hasVerifiedEmail()) {
+            $user->sendEmailVerificationNotification();
+        }
 
         if (isset($validated['roles'])) {
             $user->syncRoles($validated['roles']);
@@ -167,7 +172,7 @@ class UserController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
-                'avatar_url' => $user->avatar_url,
+                'avatar' => $user->avatar,
                 'phone' => $user->phone,
                 'bio' => $user->bio,
                 'type' => $user->type,
@@ -280,7 +285,7 @@ class UserController extends Controller
     /**
      * Update user status.
      */
-    public function updateStatus(Request $request, User $user): JsonResponse
+    public function updateStatus(Request $request, User $user)
     {
         $validated = $request->validate([
             'status' => ['required', 'in:active,inactive,suspended,banned'],
@@ -288,15 +293,7 @@ class UserController extends Controller
 
         $user->update(['status' => $validated['status']]);
 
-        // Return JSON response for Inertia to handle reload
-        return response()->json([
-            'success' => true,
-            'message' => 'User status updated successfully.',
-            'user' => [
-                'id' => $user->id,
-                'status' => $user->status,
-            ]
-        ]);
+        return redirect()->back();
     }
 
     /**
@@ -384,21 +381,115 @@ class UserController extends Controller
     {
         $validated = $request->validate([
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'notify_user' => ['sometimes', 'boolean'],
         ]);
 
-        $user->update([
-            'password' => Hash::make($validated['password']),
+        try {
+            // Update user password
+            $user->update([
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            // Optional: Invalidate existing sessions
+            // DB::table('sessions')->where('user_id', $user->id)->delete();
+
+            // Send notification email if requested
+            if ($validated['notify_user'] ?? false) {
+                // You can implement email notification here
+                \Log::info('Password reset notification should be sent to: ' . $user->email);
+
+                // Example using Laravel Notification:
+                // $user->notify(new PasswordResetNotification($validated['password']));
+            }
+
+            // Log the password reset activity
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($user)
+                ->withProperties([
+                    'notified_user' => $validated['notify_user'] ?? false,
+                ])
+                ->log('reset_password');
+
+            return redirect()->route('users.show', $user)
+                ->with('success', 'Password reset successfully.');
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to reset password: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->with('error', 'Failed to reset password: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    public function verifyEmail(User $user): RedirectResponse
+    {
+        if ($user->hasVerifiedEmail()) {
+            return redirect()->back()->with('info', 'User email is already verified.');
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return redirect()->back()->with('success', 'Verification email sent successfully.');
+    }
+
+    /**
+    * Send email to user using Mailable
+    */
+    public function sendEmail(Request $request, User $user): RedirectResponse
+    {
+        $validated = $request->validate([
+            'subject' => ['required', 'string', 'max:255'],
+            'message' => ['required', 'string', 'min:10'],
+            'cc' => ['nullable', 'array'],
+            'cc.*' => ['email'],
+            'bcc' => ['nullable', 'array'],
+            'bcc.*' => ['email'],
         ]);
 
-        // Optional: Invalidate existing sessions
-        // DB::table('sessions')->where('user_id', $user->id)->delete();
+        try {
+            // Create and send email
+            $mail = new UserNotificationMail(
+                $validated['subject'],
+                $validated['message'],
+                $user->name
+            );
 
-        activity()
-            ->causedBy(auth()->user())
-            ->performedOn($user)
-            ->log('reset_password');
+            // Send to primary recipient
+            Mail::to($user->email)->send($mail);
 
-        return redirect()->route('users.show', $user)
-            ->with('success', 'Password reset successfully.');
+            // Send to CC recipients if any
+            if (!empty($validated['cc'])) {
+                Mail::to($validated['cc'])->send($mail);
+            }
+
+            // Send to BCC recipients if any
+            if (!empty($validated['bcc'])) {
+                Mail::to($validated['bcc'])->send($mail);
+            }
+
+            // Log the email activity
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($user)
+                ->withProperties([
+                    'subject' => $validated['subject'],
+                    'cc' => $validated['cc'] ?? [],
+                    'bcc' => $validated['bcc'] ?? [],
+                    'message_preview' => substr($validated['message'], 0, 100) . '...',
+                ])
+                ->log('sent_email');
+
+            return redirect()->route('users.show', $user)
+                ->with('success', 'Email sent successfully to ' . $user->email);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to send email: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->with('error', 'Failed to send email: ' . $e->getMessage())
+                ->withInput();
+        }
     }
 }

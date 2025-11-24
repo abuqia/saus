@@ -47,7 +47,7 @@ export default function Dashboard() {
                                     </p>
                                 </div>
                             </div>
-                            <Button asChild variant="outline" size="sm" className="border-amber-300 text-amber-800">
+                            <Button asChild variant="outline" size="sm" className="border-amber-300 text-amber-800 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-400">
                                 <Link href="/users/stop-impersonate">
                                     <LogOut className="h-4 w-4 mr-2" />
                                     Stop Impersonating
@@ -142,7 +142,7 @@ export default function Dashboard() {
                                 )}
 
                                 {isImpersonating && (
-                                    <Button asChild variant="outline" className="w-full justify-start border-amber-200 text-amber-700">
+                                    <Button asChild variant="outline" className="w-full justify-start border-amber-200 text-amber-700mo">
                                         <Link href="/users/stop-impersonate">
                                             <LogOut className="h-4 w-4 mr-2" />
                                             Stop Impersonating
@@ -255,7 +255,7 @@ export default function Dashboard() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <Button asChild variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-100">
+                            <Button asChild variant="outline" className="border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-red-600 dark:bg-red-600 dark:text-white dark:hover:bg-red-400">
                                 <Link href="/users/stop-impersonate">
                                     <LogOut className="h-4 w-4 mr-2" />
                                     Stop Impersonating Now

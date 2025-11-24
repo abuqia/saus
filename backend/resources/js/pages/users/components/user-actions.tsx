@@ -74,29 +74,11 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
     }
 
     const handleStatusUpdate = async (userId: number, status: string) => {
+        setIsLoading(true)
         try {
-            const response = await fetch(`/users/${userId}/status`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify({ status }),
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                await onStatusChange(userId, status)
-                toast.success(result.message);
-                // Trigger datatable reload
-                router.reload({ only: ['users'] });
-            } else {
-                toast.error(result.message || 'Failed to update user status');
-            }
-        } catch {
-            toast.error('An error occurred while updating user status');
+            await onStatusChange(userId, status)
+        } finally {
+            setIsLoading(false)
         }
     };
 
@@ -118,7 +100,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
     }
 
     return (
-        <>
+        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -183,7 +165,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                     {/* Status Actions */}
                     {user.status === 'active' && !isCurrentUser && (
                         <DropdownMenuItem
-                            onClick={() => handleStatusUpdate(user.id, 'suspended')}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleStatusUpdate(user.id, 'suspended') }}
                             className="cursor-pointer flex items-center text-orange-600"
                         >
                             <Ban className="mr-2 h-4 w-4" />
@@ -193,7 +175,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
 
                     {(user.status === 'suspended' || user.status === 'inactive') && !isCurrentUser && (
                         <DropdownMenuItem
-                            onClick={() => handleStatusUpdate(user.id, 'active')}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleStatusUpdate(user.id, 'active') }}
                             className="cursor-pointer flex items-center text-green-600"
                         >
                             <CheckCircle className="mr-2 h-4 w-4" />
@@ -251,7 +233,7 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                         <AlertDialogAction
                             onClick={handleDelete}
                             disabled={isLoading}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="bg-destructive text-white hover:bg-destructive/90"
                         >
                             {isLoading ? "Deleting..." : "Delete User"}
                         </AlertDialogAction>
@@ -289,6 +271,6 @@ export function UserActions({ user, onStatusChange }: UserActionsProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </div>
     )
 }

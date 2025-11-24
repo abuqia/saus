@@ -72,6 +72,22 @@ export default function UserShow({ user }: UserShowProps) {
     const canEdit = currentUser.type === 'super_admin' || (currentUser.type === 'admin' && user.type !== 'super_admin');
     const canChangeStatus = canEdit && user.id !== currentUser.id;
 
+    const handleSendVerification = async () => {
+        try {
+            await router.post(`/users/${user.id}/verify-email`, {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('Verification email sent');
+                },
+                onError: () => {
+                    toast.error('Failed to send verification email');
+                },
+            });
+        } catch {
+            toast.error('An error occurred while sending verification email');
+        }
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`User - ${user.name}`} />
@@ -115,7 +131,7 @@ export default function UserShow({ user }: UserShowProps) {
                             <CardContent className="space-y-6">
                                 <div className="flex items-start gap-4">
                                     <Avatar className="h-16 w-16">
-                                        <AvatarImage src={user.avatar_url} alt={user.name} />
+                                        <AvatarImage src={user.avatar} alt={user.name} />
                                         <AvatarFallback className="text-lg">
                                             {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                                         </AvatarFallback>
@@ -368,14 +384,18 @@ export default function UserShow({ user }: UserShowProps) {
                                     <span className="text-muted-foreground">Created:</span>
                                     <span>{new Date(user.created_at).toLocaleDateString()}</span>
                                 </div>
-                                <div className="flex justify-between">
+                                <div className="flex justify-between items-center">
                                     <span className="text-muted-foreground">Email Verified:</span>
-                                    <span>
-                                        {user.email_verified_at
-                                            ? new Date(user.email_verified_at).toLocaleDateString()
-                                            : 'Not verified'
-                                        }
-                                    </span>
+                                    {user.email_verified_at ? (
+                                        <span>{new Date(user.email_verified_at).toLocaleDateString()}</span>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <span>Not verified</span>
+                                            <Button size="sm" variant="outline" onClick={handleSendVerification}>
+                                                Send verification
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                                 {user.last_login_ip && (
                                     <div className="flex justify-between">

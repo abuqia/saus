@@ -39,7 +39,7 @@ export interface User {
     email: string;
     email_verified_at?: string;
     avatar?: string;
-    avatar_url: string;
+    avatar: string;
     type: 'super_admin' | 'admin' | 'user';
     status: 'active' | 'inactive' | 'suspended' | 'banned';
     plan: 'free' | 'starter' | 'pro' | 'enterprise';
@@ -220,6 +220,11 @@ export interface PageProps<T = Record<string, any>> {
     flash?: FlashMessage;
     errors?: Record<string, string>;
     ziggy?: any;
+    user?: {
+        id: number;
+        name: string;
+        email: string;
+    };
     [key: string]: any;
 }
 

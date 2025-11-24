@@ -34,8 +34,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('users', UserController::class)->name('users', 'users');
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus'])->name('users.status');
     Route::post('users/bulk-destroy', [UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
-    Route::post('users/{user}/verify-email', [UserController::class, 'verifyEmail'])->name('users.verify-email');
-    Route::get('/users/{user}/email', [UserController::class, 'email'])->name('users.email');
+    Route::post('users/{user}/verify-email', [UserController::class, 'verifyEmail'])->name('users.verify-email')->withoutMiddleware('verified');
+    Route::get('/users/{user}/email', [UserController::class, 'email'])->name('users.email')->middleware('can:users.edit');
+    Route::post('/users/{user}/send-email', [UserController::class, 'sendEmail'])->name('users.send-email')->middleware('can:users.edit');
     Route::get('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
     Route::post('/users/{user}/reset-password', [UserController::class, 'processResetPassword'])->name('users.reset-password.update');
     Route::post('users/{user}/change-status', [UserController::class, 'changeStatus'])->name('users.change-status');

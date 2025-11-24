@@ -52,11 +52,13 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
     }, [searchTerm]);
 
     const handleStatusChange = async (userId: number, status: string) => {
+        setIsLoading(true)
         try {
             await router.patch(UserController.updateStatus(userId).url, { status }, {
                 preserveScroll: true,
                 onSuccess: () => {
                     toast.success("User status updated successfully");
+                    router.reload({ only: ['users'] });
                 },
                 onError: () => {
                     toast.error("Failed to update user status");
@@ -64,6 +66,8 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
             });
         } catch (error) {
             toast.error("An error occurred while updating user status");
+        } finally {
+            setIsLoading(false)
         }
     };
 
@@ -83,7 +87,7 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
             cell: ({ row }) => (
                 <div className="flex items-center gap-3">
                     <Avatar className="h-9 w-9">
-                        <AvatarImage src={row.original.avatar_url} alt={row.original.name} />
+                        <AvatarImage src={row.original.avatar} alt={row.original.name} />
                         <AvatarFallback className="text-sm font-medium">
                             {row.original.name
                                 .split(' ')

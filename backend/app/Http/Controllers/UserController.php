@@ -322,28 +322,32 @@ class UserController extends Controller
     /**
      * Bulk delete users.
      */
-    public function bulkDestroy(Request $request): RedirectResponse
+    public function bulkDestroy(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'ids' => ['required', 'array'],
             'ids.*' => ['exists:users,id'],
         ]);
 
-        // Prevent deleting super admins and self
         $users = User::whereIn('id', $validated['ids'])
             ->where('type', '!=', 'super_admin')
             ->where('id', '!=', auth()->id())
             ->get();
 
         if ($users->isEmpty()) {
-            return redirect()->route('users.index')
-                ->with('error', 'No users can be deleted.');
+            return response()->json([
+                'success' => false,
+                'message' => 'No users can be deleted.',
+            ], 422);
         }
 
         User::whereIn('id', $users->pluck('id'))->delete();
 
-        return redirect()->route('users.index')
-            ->with('success', count($users) . ' users deleted successfully.');
+        return response()->json([
+            'success' => true,
+            'message' => count($users) . ' users deleted successfully.',
+            'deleted_count' => count($users),
+        ]);
     }
 
     /**

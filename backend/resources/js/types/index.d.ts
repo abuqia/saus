@@ -60,22 +60,87 @@ export interface User {
 }
 
 export interface Role {
-    id: number;
+    id?: number;
     name: string;
+    guard_name: string;
     label?: string;
-    permissions?: Permission[];
+    description?: string;
+    permissions_count?: number;
     users_count?: number;
     created_at?: string;
+    updated_at?: string;
+    permissions?: Permission[];
+    users?: User[];
 }
 
 export interface Permission {
     id: number;
     name: string;
+    guard_name: string;
     label?: string;
     module?: string;
-    roles?: Role[];
+    description?: string;
     roles_count?: number;
     created_at?: string;
+    updated_at?: string;
+}
+
+export interface RolesPageProps {
+    roles: {
+        data: Role[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+    filters: {
+        search?: string;
+        guard_name?: string;
+        sort_by: string;
+        sort_direction: string;
+    };
+    stats: {
+        total: number;
+        total_users: number;
+        total_permissions: number;
+    };
+}
+
+export interface RolePermissionsProps {
+    role: {
+        id: number;
+        name: string;
+        guard_name: string;
+        label?: string;
+        permissions_count?: number;
+    };
+    permissions: Array<{
+        module: string;
+        permissions: Array<{
+            id: number;
+            name: string;
+            label?: string;
+            description?: string;
+            assigned: boolean;
+        }>;
+    }>;
+    modules: string[];
+}
+
+export interface RoleUsersProps {
+    role: {
+        id: number;
+        name: string;
+        label?: string;
+        users_count?: number;
+    };
+    users: {
+        data: User[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
 }
 
 export interface Tenant {

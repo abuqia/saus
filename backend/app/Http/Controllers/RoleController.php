@@ -2,234 +2,434 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRoleRequest;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Spatie\Permission\Models\Permission;
+use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
 
 class RoleController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware(['auth', 'verified']);
+        $this->middleware('can:roles.view')->only(['index', 'show', 'users', 'permissions']);
+        $this->middleware('can:roles.create')->only(['create', 'store']);
+        $this->middleware('can:roles.edit')->only(['edit', 'update', 'syncPermissions']);
+        $this->middleware('can:roles.delete')->only(['destroy', 'bulkDestroy']);
+    }
+
     /**
-     * Display a listing of roles
+     * Display a listing of roles.
      */
     public function index(Request $request): Response
     {
-        $this->authorize('roles.view');
+        $query = Role::withCount(['users', 'permissions']);
 
-        $roles = Role::query()
-            ->with('permissions')
-            ->withCount('users')
-            ->when($request->search, function ($query, $search) {
-                $query->where('name', 'like', "%{$search}%");
-            })
-            ->orderBy('name')
-            ->paginate($request->per_page ?? 15)
-            ->withQueryString();
+        // Search
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('label', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by guard
+        if ($guard = $request->input('guard_name')) {
+            $query->where('guard_name', $guard);
+        }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'name');
+        $sortDirection = $request->input('sort_direction', 'asc');
+        $query->orderBy($sortBy, $sortDirection);
+
+        // Pagination
+        $perPage = $request->input('per_page', 15);
+        $roles = $query->paginate($perPage)->withQueryString();
+
+        // Transform roles data
+        $roles->getCollection()->transform(function ($role) {
+            return [
+                'id' => $role->id,
+                'name' => $role->name,
+                'label' => $role->label,
+                'guard_name' => $role->guard_name,
+                'description' => $role->description,
+                'users_count' => $role->users_count,
+                'permissions_count' => $role->permissions_count,
+                'created_at' => $role->created_at?->toISOString(),
+                'updated_at' => $role->updated_at?->toISOString(),
+            ];
+        });
 
         return Inertia::render('roles/index', [
             'roles' => $roles,
-            'filters' => $request->only(['search', 'per_page']),
-            'can' => [
-                'create' => $request->user()->can('roles.create'),
-                'edit' => $request->user()->can('roles.edit'),
-                'delete' => $request->user()->can('roles.delete'),
+            'filters' => [
+                'search' => $search,
+                'guard_name' => $guard,
+                'sort_by' => $sortBy,
+                'sort_direction' => $sortDirection,
+            ],
+            'stats' => [
+                'total' => Role::count(),
+                'total_users' => \App\Models\User::has('roles')->count(),
+                'total_permissions' => Permission::count(),
             ],
         ]);
     }
 
     /**
-     * Show the form for creating a new role
+     * Show the form for creating a new role.
      */
     public function create(): Response
     {
-        $this->authorize('roles.create');
-
-        $permissions = Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
-        })->map(function ($group) {
-            return $group->map(function ($permission) {
-                return [
-                    'id' => $permission->id,
-                    'name' => $permission->name,
-                    'label' => ucwords(str_replace(['.', '_'], ' ', $permission->name)),
-                ];
-            });
-        });
+        $guards = ['web', 'api'];
 
         return Inertia::render('roles/create', [
-            'permissions' => $permissions,
+            'guards' => $guards,
         ]);
     }
 
     /**
-     * Store a newly created role
+     * Store a newly created role.
      */
-    public function store(StoreRoleRequest $request)
+    public function store(StoreRoleRequest $request): RedirectResponse
     {
-        $role = Role::create([
-            'name' => $request->name,
-            'guard_name' => 'web',
-        ]);
+        $validated = $request->validated();
 
-        if ($request->permissions) {
-            $role->syncPermissions($request->permissions);
-        }
+        $role = Role::create($validated);
 
-        return redirect()
-            ->route('roles.index')
+        // Log the activity
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($role)
+            ->withProperties([
+                'name' => $role->name,
+                'guard_name' => $role->guard_name,
+            ])
+            ->log('created_role');
+
+        return redirect()->route('roles.show', $role)
             ->with('success', 'Role created successfully.');
     }
 
     /**
-     * Display the specified role
+     * Display the specified role.
      */
     public function show(Role $role): Response
     {
-        $this->authorize('roles.view');
-
-        $role->load('permissions', 'users');
+        $role->loadCount(['users', 'permissions']);
+        $role->load(['permissions' => function ($query) {
+            $query->select('id', 'name', 'module')->limit(20);
+        }, 'users' => function ($query) {
+            $query->select('id', 'name', 'email', 'status')->limit(10);
+        }]);
 
         return Inertia::render('roles/show', [
             'role' => [
                 'id' => $role->id,
                 'name' => $role->name,
-                'users_count' => $role->users()->count(),
-                'permissions' => $role->permissions->map(fn($p) => [
-                    'id' => $p->id,
-                    'name' => $p->name,
-                    'label' => ucwords(str_replace(['.', '_'], ' ', $p->name)),
+                'guard_name' => $role->guard_name,
+                'label' => $role->label,
+                'description' => $role->description,
+                'users_count' => $role->users_count,
+                'permissions_count' => $role->permissions_count,
+                'created_at' => $role->created_at?->toISOString(),
+                'updated_at' => $role->updated_at?->toISOString(),
+                'permissions' => $role->permissions->map(fn($permission) => [
+                    'id' => $permission->id,
+                    'name' => $permission->name,
+                    'module' => $permission->module,
                 ]),
-                'created_at' => $role->created_at?->format('M d, Y'),
+                'users' => $role->users->map(fn($user) => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'status' => $user->status,
+                ]),
             ],
         ]);
     }
 
     /**
-     * Show the form for editing the specified role
+     * Show the form for editing the specified role.
      */
     public function edit(Role $role): Response
     {
-        $this->authorize('roles.edit');
-
-        // Prevent editing system roles
-        if (in_array($role->name, ['super_admin', 'admin'])) {
-            abort(403, 'Cannot edit system roles.');
-        }
-
-        $role->load('permissions');
-
-        $permissions = Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
-        })->map(function ($group) {
-            return $group->map(function ($permission) {
-                return [
-                    'id' => $permission->id,
-                    'name' => $permission->name,
-                    'label' => ucwords(str_replace(['.', '_'], ' ', $permission->name)),
-                ];
-            });
-        });
+        $guards = ['web', 'api'];
 
         return Inertia::render('roles/edit', [
             'role' => [
                 'id' => $role->id,
                 'name' => $role->name,
-                'permissions' => $role->permissions->pluck('name')->toArray(),
+                'label' => $role->label,
+                'guard_name' => $role->guard_name,
+                'description' => $role->description,
             ],
-            'permissions' => $permissions,
+            'guards' => $guards,
         ]);
     }
 
     /**
-     * Update the specified role
+     * Update the specified role.
      */
-    public function update(UpdateRoleRequest $request, Role $role)
+    public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
     {
-        // Prevent editing system roles
-        if (in_array($role->name, ['super_admin', 'admin'])) {
-            abort(403, 'Cannot edit system roles.');
+        // Prevent editing super_admin role
+        if ($role->name === 'super_admin') {
+            return redirect()->back()
+                ->with('error', 'Cannot edit super_admin role.');
         }
 
-        $role->update([
-            'name' => $request->name,
-        ]);
+        $validated = $request->validated();
 
-        $role->syncPermissions($request->permissions ?? []);
+        $role->update($validated);
 
-        return redirect()
-            ->route('roles.index')
+        // Log the activity
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($role)
+            ->withProperties([
+                'old_name' => $role->getOriginal('name'),
+                'new_name' => $validated['name'],
+                'guard_name' => $validated['guard_name'],
+            ])
+            ->log('updated_role');
+
+        return redirect()->route('roles.show', $role)
             ->with('success', 'Role updated successfully.');
     }
 
     /**
-     * Remove the specified role
+     * Remove the specified role.
      */
-    public function destroy(Role $role)
+    public function destroy(Role $role): RedirectResponse
     {
-        $this->authorize('roles.delete');
-
-        // Prevent deleting system roles
-        if (in_array($role->name, ['super_admin', 'admin', 'user'])) {
-            abort(403, 'Cannot delete system roles.');
+        // Prevent deleting super_admin role and roles with users
+        if ($role->name === 'super_admin') {
+            return redirect()->route('roles.index')
+                ->with('error', 'Cannot delete super_admin role.');
         }
 
-        // Check if role has users
-        if ($role->users()->count() > 0) {
-            return back()->with('error', 'Cannot delete role that has users assigned.');
+        if ($role->users_count > 0) {
+            return redirect()->route('roles.index')
+                ->with('error', 'Cannot delete role with assigned users.');
         }
 
+        $roleName = $role->name;
         $role->delete();
 
-        return redirect()
-            ->route('roles.index')
+        // Log the activity
+        activity()
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'role_name' => $roleName,
+            ])
+            ->log('deleted_role');
+
+        return redirect()->route('roles.index')
             ->with('success', 'Role deleted successfully.');
     }
 
     /**
-     * Bulk delete roles
+     * Bulk delete roles.
      */
-    public function bulkDestroy(Request $request)
+    public function bulkDestroy(Request $request): JsonResponse
     {
-        $this->authorize('roles.delete');
-
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:roles,id',
+        $validated = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['exists:roles,id'],
         ]);
 
-        $systemRoles = ['super_admin', 'admin', 'user'];
-
-        $roles = Role::whereIn('id', $request->ids)
-            ->whereNotIn('name', $systemRoles)
+        // Prevent deleting super_admin role and roles with users
+        $roles = Role::whereIn('id', $validated['ids'])
+            ->where('name', '!=', 'super_admin')
+            ->withCount('users')
             ->get();
 
-        $deleted = 0;
-        $errors = [];
+        $deletableRoles = $roles->filter(fn($role) => $role->users_count === 0);
+        $protectedRoles = $roles->filter(fn($role) => $role->users_count > 0 || $role->name === 'super_admin');
 
-        foreach ($roles as $role) {
-            if ($role->users()->count() > 0) {
-                $errors[] = "Role '{$role->name}' has users assigned.";
-                continue;
-            }
-
-            $role->delete();
-            $deleted++;
+        if ($deletableRoles->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No roles can be deleted. Some roles have users assigned or are system protected.',
+            ], 422);
         }
 
-        $message = $deleted > 0
-            ? "{$deleted} role(s) deleted successfully."
-            : "No roles were deleted.";
+        // Delete roles
+        Role::whereIn('id', $deletableRoles->pluck('id'))->delete();
 
-        if (!empty($errors)) {
-            $message .= ' ' . implode(' ', $errors);
+        // Log the activity
+        activity()
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'deleted_roles' => $deletableRoles->pluck('name'),
+                'protected_roles' => $protectedRoles->pluck('name'),
+            ])
+            ->log('bulk_deleted_roles');
+
+        $message = "{$deletableRoles->count()} roles deleted successfully.";
+        if ($protectedRoles->isNotEmpty()) {
+            $message .= " {$protectedRoles->count()} roles were protected and could not be deleted.";
         }
 
-        return redirect()
-            ->route('roles.index')
-            ->with($deleted > 0 ? 'success' : 'error', $message);
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'deleted_count' => $deletableRoles->count(),
+            'protected_count' => $protectedRoles->count(),
+        ]);
+    }
+
+    /**
+     * Show role permissions management page.
+     */
+    public function permissions(Role $role): Response
+    {
+        $role->load('permissions');
+
+        $permissions = Permission::all()->groupBy('module')->map(function ($permissions, $module) use ($role) {
+            return [
+                'module' => $module ?: 'General',
+                'permissions' => $permissions->map(fn($permission) => [
+                    'id' => $permission->id,
+                    'name' => $permission->name,
+                    'label' => $permission->label,
+                    'description' => $permission->description,
+                    'assigned' => $role->permissions->contains('id', $permission->id),
+                ]),
+            ];
+        })->values();
+
+        return Inertia::render('roles/permissions', [
+            'role' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'guard_name' => $role->guard_name,
+                'label' => $role->label,
+                'permissions_count' => $role->permissions_count,
+            ],
+            'permissions' => $permissions,
+            'modules' => Permission::distinct()->pluck('module')->filter()->values(),
+        ]);
+    }
+
+    /**
+     * Sync permissions to role.
+     */
+    public function syncPermissions(Request $request, Role $role): JsonResponse
+    {
+        // Prevent modifying super_admin permissions
+        if ($role->name === 'super_admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot modify permissions for super_admin role.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'permissions' => ['required', 'array'],
+            'permissions.*' => ['exists:permissions,id'],
+        ]);
+
+        try {
+            $permissions = Permission::whereIn('id', $validated['permissions'])->get();
+
+            // Get current permissions for logging
+            $currentPermissions = $role->permissions;
+
+            $role->syncPermissions($permissions);
+
+            // Get added and removed permissions for logging
+            $addedPermissions = $permissions->pluck('name')->diff($currentPermissions->pluck('name'));
+            $removedPermissions = $currentPermissions->pluck('name')->diff($permissions->pluck('name'));
+
+            // Log the activity
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($role)
+                ->withProperties([
+                    'permissions_count' => $permissions->count(),
+                    'added_permissions' => $addedPermissions,
+                    'removed_permissions' => $removedPermissions,
+                ])
+                ->log('synced_permissions');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Permissions updated successfully.',
+                'permissions_count' => $permissions->count(),
+                'added_count' => $addedPermissions->count(),
+                'removed_count' => $removedPermissions->count(),
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to sync permissions: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update permissions.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Show users assigned to role.
+     */
+    public function users(Role $role): Response
+    {
+        $users = $role->users()->paginate(20);
+
+        $users->getCollection()->transform(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'status' => $user->status,
+                'type' => $user->type,
+                'avatar_url' => $user->avatar_url,
+                'created_at' => $user->created_at?->toISOString(),
+            ];
+        });
+
+        return Inertia::render('roles/users', [
+            'role' => [
+                'id' => $role->id,
+                'name' => $role->name,
+                'label' => $role->label,
+                'users_count' => $role->users_count,
+            ],
+            'users' => $users,
+        ]);
+    }
+
+    /**
+     * Get role statistics for dashboard.
+     */
+    public function statistics(): JsonResponse
+    {
+        $stats = [
+            'total_roles' => Role::count(),
+            'total_permissions' => Permission::count(),
+            'roles_with_users' => Role::has('users')->count(),
+            'recent_roles' => Role::orderBy('created_at', 'desc')->limit(5)->get(),
+            'permissions_by_module' => Permission::select('module', DB::raw('count(*) as count'))
+                ->groupBy('module')
+                ->get()
+                ->pluck('count', 'module'),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $stats,
+        ]);
     }
 }

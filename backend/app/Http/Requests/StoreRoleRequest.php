@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreRoleRequest extends FormRequest
 {
@@ -16,8 +17,6 @@ class StoreRoleRequest extends FormRequest
 
     /**
      * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -26,41 +25,51 @@ class StoreRoleRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                'unique:roles,name',
-                'regex:/^[a-z_]+$/', // Only lowercase letters and underscores
+                'regex:/^[a-z_]+$/',
+                'unique:roles,name'
             ],
-            'permissions' => [
+            'label' => [
+                'required',
+                'string',
+                'max:255'
+            ],
+            'guard_name' => [
+                'required',
+                'string',
+                Rule::in(['web', 'api'])
+            ],
+            'description' => [
                 'nullable',
-                'array',
-            ],
-            'permissions.*' => [
-                'exists:permissions,id',
+                'string',
+                'max:500'
             ],
         ];
     }
 
     /**
-     * Get custom attribute names for validator errors.
+     * Get custom attributes for validator errors.
      */
     public function attributes(): array
     {
         return [
             'name' => 'role name',
-            'permissions' => 'permissions',
-            'permissions.*' => 'permission',
+            'label' => 'display name',
+            'guard_name' => 'guard',
         ];
     }
 
     /**
-     * Get custom messages for validator errors.
+     * Get the error messages for the defined validation rules.
      */
     public function messages(): array
     {
         return [
             'name.required' => 'The role name is required.',
+            'name.regex' => 'The role name must contain only lowercase letters and underscores.',
             'name.unique' => 'A role with this name already exists.',
-            'name.regex' => 'The role name must only contain lowercase letters and underscores.',
-            'permissions.*.exists' => 'One or more selected permissions are invalid.',
+            'label.required' => 'The display name is required.',
+            'guard_name.required' => 'Please select a guard.',
+            'guard_name.in' => 'The selected guard is invalid.',
         ];
     }
 
@@ -69,10 +78,17 @@ class StoreRoleRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Convert name to snake_case automatically
+        // Ensure name is lowercase and uses underscores
         if ($this->has('name')) {
             $this->merge([
-                'name' => strtolower(str_replace([' ', '-'], '_', $this->name)),
+                'name' => strtolower($this->name),
+            ]);
+        }
+
+        // Set default guard if not provided
+        if (!$this->has('guard_name') || empty($this->guard_name)) {
+            $this->merge([
+                'guard_name' => 'web',
             ]);
         }
     }

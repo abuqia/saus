@@ -7,6 +7,7 @@ import {
     getCoreRowModel,
     useReactTable,
 } from "@tanstack/react-table"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
     Table,
     TableBody,
@@ -48,6 +49,10 @@ interface GenericDataTableProps<TData, TValue> {
         sort_by?: string
         sort_direction?: string
     }
+    enableRowSelection?: boolean
+    onSelectionChange?: (rows: TData[]) => void
+    onRowSelectionChange?: (rows: TData[]) => void
+    getRowId?: (row: TData, index: number) => string
 }
 
 export function GenericDataTable<TData, TValue>({
@@ -65,56 +70,63 @@ export function GenericDataTable<TData, TValue>({
     clientSide,
     initialPerPage = 15,
     clientFilters,
+    enableRowSelection = false,
+    onSelectionChange,
+    onRowSelectionChange,
+    getRowId,
 }: GenericDataTableProps<TData, TValue>) {
     const normalizedSearch = (searchValue || '').toLowerCase().trim()
-    let workingData: any[] = Array.isArray(data) ? [...data] : []
+    const workingData: any[] = React.useMemo(() => {
+        let rows: any[] = Array.isArray(data) ? [...data] : []
+        if (clientSide) {
+            if (normalizedSearch && searchKey) {
+                rows = rows.filter((row: any) => {
+                    const primary = String(row?.[searchKey] ?? '').toLowerCase()
+                    const emailValue = String(row?.email ?? '').toLowerCase()
+                    return primary.includes(normalizedSearch) || emailValue.includes(normalizedSearch)
+                })
+            }
 
-    if (clientSide) {
-        if (normalizedSearch && searchKey) {
-            workingData = workingData.filter((row: any) => {
-                const primary = String(row?.[searchKey] ?? '').toLowerCase()
-                const emailValue = String(row?.email ?? '').toLowerCase()
-                return primary.includes(normalizedSearch) || emailValue.includes(normalizedSearch)
-            })
-        }
+            if (clientFilters?.status) {
+                rows = rows.filter((row: any) => String(row?.status) === clientFilters.status)
+            }
+            if (clientFilters?.type) {
+                rows = rows.filter((row: any) => String(row?.type) === clientFilters.type)
+            }
+            if (clientFilters?.plan) {
+                rows = rows.filter((row: any) => String(row?.plan) === clientFilters.plan)
+            }
 
-        if (clientFilters?.status) {
-            workingData = workingData.filter((row: any) => String(row?.status) === clientFilters.status)
+            if (clientFilters?.sort_by) {
+                const key = clientFilters.sort_by
+                const dir = (clientFilters.sort_direction || 'desc') === 'asc' ? 1 : -1
+                rows.sort((a: any, b: any) => {
+                    const va = a?.[key]
+                    const vb = b?.[key]
+                    if (va == null && vb == null) return 0
+                    if (va == null) return 1
+                    if (vb == null) return -1
+                    const isDateKey = key === 'created_at' || key === 'last_login_at'
+                    const aa = isDateKey ? new Date(va).getTime() : String(va).toLowerCase()
+                    const bb = isDateKey ? new Date(vb).getTime() : String(vb).toLowerCase()
+                    if (aa < bb) return -1 * dir
+                    if (aa > bb) return 1 * dir
+                    return 0
+                })
+            }
         }
-        if (clientFilters?.type) {
-            workingData = workingData.filter((row: any) => String(row?.type) === clientFilters.type)
-        }
-        if (clientFilters?.plan) {
-            workingData = workingData.filter((row: any) => String(row?.plan) === clientFilters.plan)
-        }
-
-        if (clientFilters?.sort_by) {
-            const key = clientFilters.sort_by
-            const dir = (clientFilters.sort_direction || 'desc') === 'asc' ? 1 : -1
-            workingData.sort((a: any, b: any) => {
-                const va = a?.[key]
-                const vb = b?.[key]
-                if (va == null && vb == null) return 0
-                if (va == null) return 1
-                if (vb == null) return -1
-                const isDateKey = key === 'created_at' || key === 'last_login_at'
-                const aa = isDateKey ? new Date(va).getTime() : String(va).toLowerCase()
-                const bb = isDateKey ? new Date(vb).getTime() : String(vb).toLowerCase()
-                if (aa < bb) return -1 * dir
-                if (aa > bb) return 1 * dir
-                return 0
-            })
-        }
-    }
+        return rows
+    }, [data, clientSide, normalizedSearch, searchKey, clientFilters])
 
     let page = 1
     let perPage = initialPerPage
     let total = workingData.length
     let lastPage = Math.max(1, Math.ceil(total / perPage))
-    let pagedData = workingData.slice((page - 1) * perPage, page * perPage)
+    let pagedData = React.useMemo(() => workingData.slice((page - 1) * perPage, page * perPage), [workingData, page, perPage])
 
     const [statePage, setStatePage] = React.useState(page)
     const [statePerPage, setStatePerPage] = React.useState(perPage)
+    const [rowSelection, setRowSelection] = React.useState({} as Record<string, boolean>)
 
     if (clientSide) {
         page = statePage
@@ -125,12 +137,49 @@ export function GenericDataTable<TData, TValue>({
         pagedData = workingData.slice((page - 1) * perPage, page * perPage)
     }
 
+    const selectionColumn = React.useMemo<ColumnDef<TData, unknown>>(() => ({
+        id: "select",
+        header: ({ table }) => (
+            <Checkbox
+                checked={table.getIsAllPageRowsSelected()}
+                onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                aria-label="Select all"
+                className="translate-y-[2px]"
+                onClick={(e) => e.stopPropagation()}
+            />
+        ),
+        cell: ({ row }) => (
+            <Checkbox
+                checked={row.getIsSelected()}
+                onCheckedChange={(value) => row.toggleSelected(!!value)}
+                aria-label="Select row"
+                className="translate-y-[2px]"
+                onClick={(e) => e.stopPropagation()}
+            />
+        ),
+        size: 32,
+    }), [])
+
+    const composedColumns = React.useMemo(() => {
+        return enableRowSelection ? ([selectionColumn, ...columns] as ColumnDef<TData, any>[]) : columns
+    }, [enableRowSelection, selectionColumn, columns])
+
     const table = useReactTable({
         data: clientSide ? pagedData : workingData,
-        columns,
+        columns: composedColumns,
         getCoreRowModel: getCoreRowModel(),
         manualPagination: true,
+        enableRowSelection,
+        onRowSelectionChange: setRowSelection,
+        state: { rowSelection },
+        getRowId: (row, index) => (typeof getRowId === "function" ? getRowId(row as TData, index) : String(index)),
     })
+
+    React.useEffect(() => {
+        const selected = table.getSelectedRowModel().flatRows.map(r => r.original as TData)
+        if (onSelectionChange) onSelectionChange(selected)
+        if (onRowSelectionChange) onRowSelectionChange(selected)
+    }, [onSelectionChange, onRowSelectionChange, table, rowSelection])
 
     if (isLoading) {
         return <DataTableSkeleton columns={columns.length} />
@@ -182,7 +231,9 @@ export function GenericDataTable<TData, TValue>({
                                     )}
                                 >
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id}>
+                                        <TableCell key={cell.id} onClick={(e) => {
+                                            if (cell.column.id === "select") e.stopPropagation()
+                                        }}>
                                             {flexRender(
                                                 cell.column.columnDef.cell,
                                                 cell.getContext()

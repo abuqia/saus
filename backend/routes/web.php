@@ -35,16 +35,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus'])->name('users.status');
     Route::post('users/bulk-destroy', [UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
     Route::post('users/{user}/verify-email', [UserController::class, 'verifyEmail'])->name('users.verify-email')->withoutMiddleware('verified');
-    Route::get('/users/{user}/email', [UserController::class, 'email'])->name('users.email')->middleware('can:users.edit');
-    Route::post('/users/{user}/send-email', [UserController::class, 'sendEmail'])->name('users.send-email')->middleware('can:users.edit');
-    Route::get('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
-    Route::post('/users/{user}/reset-password', [UserController::class, 'processResetPassword'])->name('users.reset-password.update');
+    Route::get('users/{user}/email', [UserController::class, 'email'])->name('users.email')->middleware('can:users.edit');
+    Route::post('users/{user}/send-email', [UserController::class, 'sendEmail'])->name('users.send-email')->middleware('can:users.edit');
+    Route::get('users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+    Route::post('users/{user}/reset-password', [UserController::class, 'processResetPassword'])->name('users.reset-password.update');
     Route::post('users/{user}/change-status', [UserController::class, 'changeStatus'])->name('users.change-status');
 
     // ============================================
     // ROLE MANAGEMENT
     // ============================================
     Route::resource('roles', RoleController::class);
+    Route::get('roles/{role}/users', [RoleController::class, 'users'])->name('roles.users');
+    Route::get('roles/{role}/permissions', [RoleController::class, 'permissions'])->name('roles.permissions');
+    Route::put('roles/{role}/permissions', [RoleController::class, 'updatePermissions'])->name('roles.permissions.update');
     Route::post('roles/bulk-destroy', [RoleController::class, 'bulkDestroy'])->name('roles.bulk-destroy');
     Route::post('roles/{role}/sync-permissions', [RoleController::class, 'syncPermissions'])->name('roles.sync-permissions');
 

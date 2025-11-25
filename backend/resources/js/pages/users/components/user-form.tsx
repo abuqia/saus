@@ -235,9 +235,9 @@ export function UserForm({ user, roles, isEdit = false }: UserFormProps) {
                                         <div key={role.id} className="flex items-center space-x-2">
                                             <Checkbox
                                                 id={`role-${role.id}`}
-                                                checked={data.roles.includes(role.id)}
+                                                checked={role.id != null && data.roles.includes(role.id!)}
                                                 onCheckedChange={checked =>
-                                                    handleRoleChange(role.id, checked as boolean)
+                                                    handleRoleChange(role.id!, checked as boolean)
                                                 }
                                             />
                                             <Label

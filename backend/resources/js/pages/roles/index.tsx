@@ -1,98 +1,115 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader, StatsCard } from '@/components/page-header';
-import { DataTable } from '@/components/data-table';
+import { GenericDataTable } from '@/components/data-table/generic-data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { router, Link } from '@inertiajs/react';
+import { router, Link, Head } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
-import { Shield, Plus, MoreVertical, Edit, Trash, Users, Eye } from 'lucide-react';
-import { useState } from 'react';
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+    Shield,
+    Plus,
+    Users,
+    Key,
+    Calendar,
+    MoreVertical,
+    Edit,
+    Trash,
+    Eye,
+} from 'lucide-react';
+import { useState } from 'react';
+import type { BreadcrumbItem, Role, RolesPageProps } from '@/types';
+import { RoleActions } from './components/role-actions';
+import { RoleFilters } from './components/role-filters';
+import { RoleBulkActions } from './components/role-bulk-actions';
+import { toast } from 'sonner';
 
-interface Role {
-    id: number;
-    name: string;
-    display_name: string;
-    guard_name: string;
-    permissions_count: number;
-    users_count: number;
-    created_at: string;
-    is_system: boolean;
-}
+export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
+    const [isLoading, setIsLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState(filters.search || '');
+    const [selectedRows, setSelectedRows] = useState<Role[]>([]);
 
-interface PageProps {
-    roles: {
-        data: Role[];
-        current_page: number;
-        last_page: number;
-        per_page: number;
-        total: number;
+    const handlePageChange = (page: number) => {
+        setIsLoading(true);
+        router.get('/roles', { page, search: searchTerm, ...filters }, {
+            preserveState: true,
+            onFinish: () => setIsLoading(false),
+        });
     };
-    filters: {
-        search?: string;
-        sort_by: string;
-        sort_direction: string;
-        per_page: number;
-    };
-    stats: {
-        total: number;
-        with_users: number;
-        system_roles: number;
-    };
-}
 
-export default function RolesIndex({ roles, filters, stats }: PageProps) {
-    const [deleteId, setDeleteId] = useState<number | null>(null);
+    const handleSearch = (search: string) => {
+        setSearchTerm(search);
+        router.get('/roles', { search, ...filters }, {
+            preserveState: true,
+            replace: true,
+        });
+    };
 
-    const handleDelete = () => {
-        if (deleteId) {
-            router.delete(`/roles/${deleteId}`, {
+    const handleDelete = async (roleId: number) => {
+        if (!confirm('Are you sure you want to delete this role? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await router.delete(`/roles/${roleId}`, {
                 preserveScroll: true,
-                onSuccess: () => setDeleteId(null),
+                onSuccess: () => {
+                    toast.success('Role deleted successfully');
+                },
+                onError: () => {
+                    toast.error('Failed to delete role');
+                },
             });
+        } catch (error) {
+            toast.error('An error occurred while deleting the role');
+        }
+    };
+
+    const handleBulkDelete = async (ids: number[]) => {
+        try {
+            const response = await fetch('/roles/bulk-destroy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                },
+                body: JSON.stringify({ ids }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                toast.success(result.message);
+                setSelectedRows([]);
+                router.reload({ only: ['roles'] });
+            } else {
+                toast.error(result.message);
+            }
+        } catch (error) {
+            toast.error('An error occurred while deleting roles');
         }
     };
 
     const columns: ColumnDef<Role>[] = [
         {
-            accessorKey: 'display_name',
-            header: 'Role Name',
+            accessorKey: 'name',
+            header: 'Role',
             cell: ({ row }) => (
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
                         <Shield className="h-5 w-5 text-primary" />
                     </div>
-                    <div>
-                        <div className="font-medium">{row.original.display_name}</div>
-                        <div className="text-sm text-muted-foreground">{row.original.name}</div>
+                    <div className="flex flex-col">
+                        <span className="font-medium text-sm capitalize">
+                            {row.original.name.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {row.original.label || 'No description'}
+                        </span>
                     </div>
                 </div>
             ),
-        },
-        {
-            accessorKey: 'permissions_count',
-            header: 'Permissions',
-            cell: ({ row }) => (
-                <Badge variant="secondary">{row.original.permissions_count} permissions</Badge>
-            ),
+            size: 250,
         },
         {
             accessorKey: 'users_count',
@@ -100,78 +117,78 @@ export default function RolesIndex({ roles, filters, stats }: PageProps) {
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>{row.original.users_count}</span>
+                    <span className="text-sm font-medium">{row.original.users_count || 0}</span>
                 </div>
             ),
+            size: 100,
+        },
+        {
+            accessorKey: 'permissions_count',
+            header: 'Permissions',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2">
+                    <Key className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{row.original.permissions_count || 0}</span>
+                </div>
+            ),
+            size: 120,
         },
         {
             accessorKey: 'guard_name',
             header: 'Guard',
-            cell: ({ row }) => <Badge variant="outline">{row.original.guard_name}</Badge>,
+            cell: ({ row }) => (
+                <Badge variant="outline" className="capitalize">
+                    {row.original.guard_name}
+                </Badge>
+            ),
+            size: 100,
         },
         {
             accessorKey: 'created_at',
             header: 'Created',
             cell: ({ row }) => (
-                <span className="text-sm text-muted-foreground">
-                    {new Date(row.original.created_at).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(row.original.created_at!).toLocaleDateString()}
+                </div>
             ),
+            size: 120,
         },
         {
             id: 'actions',
-            cell: ({ row }) => {
-                const role = row.original;
+            header: 'Actions',
+            cell: ({ row }) => (
+                <RoleActions
+                    role={row.original}
+                    onDelete={handleDelete}
+                />
+            ),
+            size: 80,
+            enableSorting: false,
+        },
+    ];
 
-                return (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                                <Link href={`/roles/${role.id}`}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Details
-                                </Link>
-                            </DropdownMenuItem>
-                            {!role.is_system && (
-                                <>
-                                    <DropdownMenuItem asChild>
-                                        <Link href={`/roles/${role.id}/edit`}>
-                                            <Edit className="mr-2 h-4 w-4" />
-                                            Edit
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                        className="text-destructive"
-                                        onClick={() => setDeleteId(role.id)}
-                                    >
-                                        <Trash className="mr-2 h-4 w-4" />
-                                        Delete
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                );
-            },
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Dashboard',
+            href: '/',
+        },
+        {
+            title: 'Roles & Permissions',
+            href: '/roles',
         },
     ];
 
     return (
-        <>
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Roles & Permissions" />
+
             <PageHeader
-                title="Roles"
-                description="Manage user roles and permissions"
+                title="Roles & Permissions"
+                description="Manage user roles and their permissions"
                 icon={Shield}
                 actions={
-                    <Button asChild>
+                    <Button asChild className="shadow-sm">
                         <Link href="/roles/create">
                             <Plus className="mr-2 h-4 w-4" />
                             Create Role
@@ -180,55 +197,88 @@ export default function RolesIndex({ roles, filters, stats }: PageProps) {
                 }
             />
 
-            {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-3 mb-6">
+            {/* Stats Overview */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
                 <StatsCard
                     title="Total Roles"
-                    value={stats.total}
+                    value={stats.total.toLocaleString()}
                     icon={Shield}
+                    description="All system roles"
+                    className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
                 />
                 <StatsCard
-                    title="Roles with Users"
-                    value={stats.with_users}
+                    title="Assigned Users"
+                    value={stats.total_users.toLocaleString()}
                     icon={Users}
+                    description="Users with roles"
+                    className="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
                 />
                 <StatsCard
-                    title="System Roles"
-                    value={stats.system_roles}
-                    description="Protected system roles"
+                    title="Total Permissions"
+                    value={stats.total_permissions.toLocaleString()}
+                    icon={Key}
+                    description="Available permissions"
+                    className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+                />
+                <StatsCard
+                    title="Default Guard"
+                    value="Web"
+                    description="Primary guard"
+                    className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
                 />
             </div>
 
-            {/* Data Table */}
-            <div className="rounded-lg border bg-card">
-                <DataTable
+            {/* Data Table Section */}
+            <div className="bg-white rounded-lg border shadow-sm">
+                <GenericDataTable
                     columns={columns}
                     data={roles.data}
-                    searchKey="display_name"
-                    searchPlaceholder="Search roles..."
+                    searchKey="name"
+                    searchPlaceholder="Search roles by name..."
+                    filters={
+                        <div className="flex items-center gap-2">
+                            <RoleFilters currentFilters={filters} />
+                            <RoleBulkActions
+                                selectedRows={selectedRows}
+                                onBulkDelete={handleBulkDelete}
+                            />
+                        </div>
+                    }
+                    onRowSelectionChange={setSelectedRows}
+                    isLoading={isLoading}
+                    pagination={{
+                        currentPage: roles.current_page,
+                        lastPage: roles.last_page,
+                        perPage: roles.per_page,
+                        total: roles.total,
+                        onPageChange: handlePageChange,
+                    }}
+                    onRowClick={(role) => router.visit(`/roles/${role.id}`)}
+                    className="p-6"
                 />
             </div>
 
-            {/* Delete Confirmation Dialog */}
-            <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the role
-                            and remove it from all users.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </>
+            {/* Empty State Handling */}
+            {roles.data.length === 0 && !isLoading && (
+                <div className="text-center py-12">
+                    <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-4 text-lg font-semibold">No roles found</h3>
+                    <p className="text-muted-foreground mt-2">
+                        {searchTerm || Object.values(filters).some(Boolean)
+                            ? "Try adjusting your search or filters to find what you're looking for."
+                            : "Get started by creating your first role."
+                        }
+                    </p>
+                    {!searchTerm && !Object.values(filters).some(Boolean) && (
+                        <Button asChild className="mt-4">
+                            <Link href="/roles/create">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create Role
+                            </Link>
+                        </Button>
+                    )}
+                </div>
+            )}
+        </AppLayout>
     );
 }
-
-RolesIndex.layout = (page: React.ReactNode) => <AppLayout children={page} />;

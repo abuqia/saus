@@ -10,7 +10,7 @@ import { UserFilters } from './components/user-filters';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { router, Link, Head } from '@inertiajs/react';
+import { router, Link, Head, usePage } from '@inertiajs/react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
     Users as UsersIcon,
@@ -22,16 +22,29 @@ import {
     ShieldCheck,
     UserPlus,
     UserCog,
+    Trash,
+    MoreHorizontal,
 } from 'lucide-react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useEffect, useState } from 'react';
 import type { BreadcrumbItem, User, UsersPageProps } from '@/types';
 import { toast } from 'sonner';
 import { dashboard } from '@/routes';
 import UserController from '@/actions/App/Http/Controllers/UserController';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
+    const { props } = usePage<any>();
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
+    const [selectedRows, setSelectedRows] = useState<User[]>([]);
     const [clientFilters, setClientFilters] = useState({
         status: filters.status || '',
         type: filters.type || '',
@@ -69,6 +82,44 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
         } finally {
             setIsLoading(false)
         }
+    };
+
+    const handleBulkDelete = async () => {
+        const ids = selectedRows.map(u => u.id!).filter(Boolean);
+        if (ids.length === 0) return;
+        toast.warning(`Hapus ${ids.length} user?`, {
+            description: 'Tindakan ini tidak dapat dibatalkan.',
+            duration: 10000,
+            closeButton: true,
+            action: {
+                label: 'Hapus',
+                onClick: async () => {
+                    setIsLoading(true);
+                    try {
+                        const response = await fetch('/users/bulk-destroy', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                            },
+                            body: JSON.stringify({ ids }),
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            toast.success(result.message || 'Berhasil menghapus user terpilih');
+                            setSelectedRows([]);
+                            router.reload({ only: ['users'] });
+                        } else {
+                            toast.error(result.message || 'Gagal menghapus user terpilih');
+                        }
+                    } catch (error) {
+                        toast.error('Terjadi kesalahan saat menghapus user');
+                    } finally {
+                        setIsLoading(false);
+                    }
+                },
+            },
+        });
     };
 
     const formatDate = (dateString: string | null) => {
@@ -281,22 +332,52 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
 
                 {/* Data Table Section */}
                 <div className="bg-card rounded-lg border shadow-sm">
-                    <GenericDataTable
-                        columns={columns}
-                        data={users.data}
-                        searchKey="name"
-                        searchPlaceholder="Search users by name, email..."
-                        onSearch={handleSearch}
-                        searchValue={searchTerm}
-                        filters={<UserFilters currentFilters={clientFilters} onChange={(f) => setClientFilters(prev => ({ ...prev, ...f }))} />}
-                        isLoading={isLoading}
-                        clientSide
-                        initialPerPage={users.per_page}
-                        clientFilters={clientFilters}
-                        onRowClick={(user) => router.visit(`/users/${user.id}`)}
-                        className="p-6"
-                    />
-                </div>
+                        <GenericDataTable
+                            columns={columns}
+                            data={users.data}
+                            searchKey="name"
+                            searchPlaceholder="Search users by name, email..."
+                            onSearch={handleSearch}
+                            searchValue={searchTerm}
+                            filters={
+                                <div className="flex items-center gap-2">
+                                    <UserFilters currentFilters={clientFilters} onChange={(f) => setClientFilters(prev => ({ ...prev, ...f }))} />
+                                    {selectedRows.length > 0 && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">
+                                                {selectedRows.length} selected
+                                            </span>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="h-9">
+                                                        <MoreHorizontal className="h-4 w-4 mr-2" />
+                                                        Actions
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={handleBulkDelete} className="text-destructive">
+                                                        <Trash className="mr-2 h-4 w-4" />
+                                                        Delete Selected
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    )}
+                                </div>
+                            }
+                            isLoading={isLoading}
+                            clientSide
+                            initialPerPage={users.per_page}
+                            clientFilters={clientFilters}
+                            onRowClick={(user) => router.visit(`/users/${user.id}`)}
+                            className="p-6"
+                            enableRowSelection
+                            onSelectionChange={setSelectedRows}
+                            getRowId={(row) => String(row.id)}
+                        />
+                    </div>
 
                 {/* Empty State Handling */}
                 {users.data.length === 0 && !isLoading && (

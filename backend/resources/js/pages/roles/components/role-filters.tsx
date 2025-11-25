@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Filter, X } from "lucide-react"
-import { router } from "@inertiajs/react"
 import { useState, useEffect } from "react"
 
 interface RoleFiltersProps {
@@ -17,9 +16,14 @@ interface RoleFiltersProps {
         sort_by?: string
         sort_direction?: string
     }
+    onChange?: (filters: {
+        guard_name?: string
+        sort_by?: string
+        sort_direction?: string
+    }) => void
 }
 
-export function RoleFilters({ currentFilters }: RoleFiltersProps) {
+export function RoleFilters({ currentFilters, onChange }: RoleFiltersProps) {
     const [filters, setFilters] = useState({
         guard_name: currentFilters.guard_name || '',
         sort_by: currentFilters.sort_by || 'name',
@@ -38,12 +42,7 @@ export function RoleFilters({ currentFilters }: RoleFiltersProps) {
     const handleFilterChange = (key: string, value: string) => {
         const newFilters = { ...filters, [key]: value }
         setFilters(newFilters)
-
-        // Apply filter immediately
-        router.get('/roles', newFilters, {
-            preserveState: true,
-            replace: true,
-        })
+        if (typeof onChange === 'function') onChange(newFilters)
     }
 
     const clearFilters = () => {
@@ -53,10 +52,7 @@ export function RoleFilters({ currentFilters }: RoleFiltersProps) {
             sort_direction: 'asc',
         }
         setFilters(resetFilters)
-        router.get('/roles', resetFilters, {
-            preserveState: true,
-            replace: true,
-        })
+        if (typeof onChange === 'function') onChange(resetFilters)
     }
 
     const hasActiveFilters = filters.guard_name
@@ -65,14 +61,14 @@ export function RoleFilters({ currentFilters }: RoleFiltersProps) {
         <div className="flex items-center gap-2">
             {/* Guard Filter */}
             <Select
-                value={filters.guard_name}
-                onValueChange={(value) => handleFilterChange('guard_name', value)}
+                value={filters.guard_name || ''}
+                onValueChange={(value) => handleFilterChange('guard_name', value === 'all' ? '' : value)}
             >
                 <SelectTrigger className="w-[140px] h-9">
                     <SelectValue placeholder="All Guards" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="">All Guards</SelectItem>
+                    <SelectItem value="all">All Guards</SelectItem>
                     <SelectItem value="web">Web Guard</SelectItem>
                     <SelectItem value="api">API Guard</SelectItem>
                 </SelectContent>

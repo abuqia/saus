@@ -46,6 +46,7 @@ interface GenericDataTableProps<TData, TValue> {
         status?: string
         type?: string
         plan?: string
+        guard_name?: string
         sort_by?: string
         sort_direction?: string
     }
@@ -95,6 +96,9 @@ export function GenericDataTable<TData, TValue>({
             }
             if (clientFilters?.plan) {
                 rows = rows.filter((row: any) => String(row?.plan) === clientFilters.plan)
+            }
+            if (clientFilters?.guard_name) {
+                rows = rows.filter((row: any) => String(row?.guard_name) === clientFilters.guard_name)
             }
 
             if (clientFilters?.sort_by) {
@@ -232,7 +236,9 @@ export function GenericDataTable<TData, TValue>({
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id} onClick={(e) => {
-                                            if (cell.column.id === "select") e.stopPropagation()
+                                            if (cell.column.id === "select" || cell.column.id === "actions") {
+                                                e.stopPropagation()
+                                            }
                                         }}>
                                             {flexRender(
                                                 cell.column.columnDef.cell,

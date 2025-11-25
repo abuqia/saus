@@ -33,14 +33,15 @@ export default function EditRole({ role, guards }: EditRoleProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Role - ${role.name}`} />
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+                <PageHeader
+                    title="Edit Role"
+                    description={`Update ${role.name}'s information and settings`}
+                    icon={Shield}
+                />
 
-            <PageHeader
-                title="Edit Role"
-                description={`Update ${role.name}'s information and settings`}
-                icon={Shield}
-            />
-
-            <RoleForm role={role} guards={guards} isEdit={true} />
+                <RoleForm role={role} guards={guards} isEdit={true} />
+            </div>
         </AppLayout>
     );
 }

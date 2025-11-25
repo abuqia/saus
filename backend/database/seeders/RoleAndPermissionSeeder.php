@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 
 class RoleAndPermissionSeeder extends Seeder
 {
@@ -109,13 +109,19 @@ class RoleAndPermissionSeeder extends Seeder
         // ============================================
         // SUPER ADMIN ROLE
         // ============================================
-        $superAdmin = Role::firstOrCreate(['name' => 'super_admin']);
+        $superAdmin = Role::updateOrCreate(
+            ['name' => 'super_admin', 'guard_name' => 'web'],
+            ['label' => 'Super Admin', 'description' => 'Full system access and management']
+        );
         $superAdmin->syncPermissions(Permission::all());
 
         // ============================================
         // ADMIN ROLE (Platform Admin)
         // ============================================
-        $admin = Role::firstOrCreate(['name' => 'admin']);
+        $admin = Role::updateOrCreate(
+            ['name' => 'admin', 'guard_name' => 'web'],
+            ['label' => 'Administrator', 'description' => 'Platform administrator with elevated privileges']
+        );
         $admin->syncPermissions([
             // Users
             'users.view',
@@ -144,7 +150,10 @@ class RoleAndPermissionSeeder extends Seeder
         // ============================================
 
         // Tenant Owner (Full control of their tenant)
-        $tenantOwner = Role::firstOrCreate(['name' => 'tenant_owner']);
+        $tenantOwner = Role::updateOrCreate(
+            ['name' => 'tenant_owner', 'guard_name' => 'web'],
+            ['label' => 'Tenant Owner', 'description' => 'Owns tenant and has full control over tenant resources']
+        );
         $tenantOwner->syncPermissions([
             // Team
             'team.view',
@@ -202,7 +211,10 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Tenant Admin (Can manage content and team)
-        $tenantAdmin = Role::firstOrCreate(['name' => 'tenant_admin']);
+        $tenantAdmin = Role::updateOrCreate(
+            ['name' => 'tenant_admin', 'guard_name' => 'web'],
+            ['label' => 'Tenant Admin', 'description' => 'Manages content and team within tenant']
+        );
         $tenantAdmin->syncPermissions([
             // Team
             'team.view',
@@ -246,7 +258,10 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Tenant Editor (Can create and edit content)
-        $tenantEditor = Role::firstOrCreate(['name' => 'tenant_editor']);
+        $tenantEditor = Role::updateOrCreate(
+            ['name' => 'tenant_editor', 'guard_name' => 'web'],
+            ['label' => 'Tenant Editor', 'description' => 'Creates and edits content within tenant']
+        );
         $tenantEditor->syncPermissions([
             // Links
             'links.view',
@@ -273,7 +288,10 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Tenant Viewer (Read-only access)
-        $tenantViewer = Role::firstOrCreate(['name' => 'tenant_viewer']);
+        $tenantViewer = Role::updateOrCreate(
+            ['name' => 'tenant_viewer', 'guard_name' => 'web'],
+            ['label' => 'Tenant Viewer', 'description' => 'Read-only access to tenant content']
+        );
         $tenantViewer->syncPermissions([
             'links.view',
             'links.analytics',
@@ -286,7 +304,10 @@ class RoleAndPermissionSeeder extends Seeder
         // ============================================
         // USER ROLE (Regular registered user without tenant)
         // ============================================
-        $user = Role::firstOrCreate(['name' => 'user']);
+        $user = Role::updateOrCreate(
+            ['name' => 'user', 'guard_name' => 'web'],
+            ['label' => 'User', 'description' => 'Registered user without tenant']
+        );
         $user->syncPermissions([
             'tenants.create', // Can create their first tenant
         ]);

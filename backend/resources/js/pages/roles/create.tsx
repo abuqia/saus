@@ -29,13 +29,15 @@ export default function CreateRole({ guards }: CreateRoleProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Role" />
 
-            <PageHeader
-                title="Create New Role"
-                description="Define a new role with specific permissions and access levels"
-                icon={Shield}
-            />
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+                <PageHeader
+                    title="Create New Role"
+                    description="Define a new role with specific permissions and access levels"
+                    icon={Shield}
+                />
 
-            <RoleForm guards={guards} />
+                <RoleForm guards={guards} />
+            </div>
         </AppLayout>
     );
 }

@@ -149,85 +149,86 @@ export default function RoleUsers({ role, users }: RoleUsersProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Users - ${role.name}`} />
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+                <PageHeader
+                    title="Assigned Users"
+                    description={`Users assigned to ${role.label || role.name} role`}
+                    icon={Users}
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <Button asChild variant="outline">
+                                <Link href={`/roles/${role.id}`}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                    Back to Role
+                                </Link>
+                            </Button>
+                            <Button asChild variant="outline">
+                                <Link href="/users">
+                                    <User className="mr-2 h-4 w-4" />
+                                    Manage Users
+                                </Link>
+                            </Button>
+                        </div>
+                    }
+                />
 
-            <PageHeader
-                title="Assigned Users"
-                description={`Users assigned to ${role.label || role.name} role`}
-                icon={Users}
-                actions={
-                    <div className="flex items-center gap-2">
-                        <Button asChild variant="outline">
-                            <Link href={`/roles/${role.id}`}>
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back to Role
-                            </Link>
-                        </Button>
-                        <Button asChild variant="outline">
+                {/* Role Summary */}
+                <div className="grid gap-4 md:grid-cols-4 mb-6">
+                    <div className="col-span-4">
+                        <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+                                <Shield className="h-6 w-6 text-primary" />
+                            </div>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold capitalize">
+                                    {role.label || role.name.replace(/_/g, ' ')}
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    {role.users_count || 0} users assigned to this role
+                                </p>
+                            </div>
+                            <Badge variant="outline" className="text-sm">
+                                {role.name}
+                            </Badge>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Data Table */}
+                <div className="bg-white rounded-lg border shadow-sm">
+                    <GenericDataTable
+                        columns={columns}
+                        data={users.data}
+                        isLoading={isLoading}
+                        pagination={{
+                            currentPage: users.current_page,
+                            lastPage: users.last_page,
+                            perPage: users.per_page,
+                            total: users.total,
+                            onPageChange: handlePageChange,
+                        }}
+                        onRowClick={(user) => router.visit(`/users/${user.id}`)}
+                        className="p-6"
+                    />
+                </div>
+
+                {/* Empty State */}
+                {users.data.length === 0 && !isLoading && (
+                    <div className="text-center py-12">
+                        <Users className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-4 text-lg font-semibold">No users assigned</h3>
+                        <p className="text-muted-foreground mt-2">
+                            There are no users assigned to this role yet.
+                        </p>
+                        <Button asChild className="mt-4">
                             <Link href="/users">
                                 <User className="mr-2 h-4 w-4" />
                                 Manage Users
                             </Link>
                         </Button>
                     </div>
-                }
-            />
-
-            {/* Role Summary */}
-            <div className="grid gap-4 md:grid-cols-4 mb-6">
-                <div className="col-span-4">
-                    <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                            <Shield className="h-6 w-6 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-semibold capitalize">
-                                {role.label || role.name.replace(/_/g, ' ')}
-                            </h3>
-                            <p className="text-sm text-muted-foreground">
-                                {role.users_count || 0} users assigned to this role
-                            </p>
-                        </div>
-                        <Badge variant="outline" className="text-sm">
-                            {role.name}
-                        </Badge>
-                    </div>
-                </div>
+                )}
             </div>
-
-            {/* Data Table */}
-            <div className="bg-white rounded-lg border shadow-sm">
-                <GenericDataTable
-                    columns={columns}
-                    data={users.data}
-                    isLoading={isLoading}
-                    pagination={{
-                        currentPage: users.current_page,
-                        lastPage: users.last_page,
-                        perPage: users.per_page,
-                        total: users.total,
-                        onPageChange: handlePageChange,
-                    }}
-                    onRowClick={(user) => router.visit(`/users/${user.id}`)}
-                    className="p-6"
-                />
-            </div>
-
-            {/* Empty State */}
-            {users.data.length === 0 && !isLoading && (
-                <div className="text-center py-12">
-                    <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-semibold">No users assigned</h3>
-                    <p className="text-muted-foreground mt-2">
-                        There are no users assigned to this role yet.
-                    </p>
-                    <Button asChild className="mt-4">
-                        <Link href="/users">
-                            <User className="mr-2 h-4 w-4" />
-                            Manage Users
-                        </Link>
-                    </Button>
-                </div>
-            )}
         </AppLayout>
     );
 }

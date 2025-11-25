@@ -16,6 +16,7 @@ import {
     Edit,
     Trash,
     Eye,
+    ShieldOffIcon,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { BreadcrumbItem, Role, RolesPageProps } from '@/types';
@@ -27,22 +28,19 @@ import { toast } from 'sonner';
 export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
+    const [clientFilters, setClientFilters] = useState({
+        guard_name: filters.guard_name || '',
+        sort_by: filters.sort_by || 'name',
+        sort_direction: filters.sort_direction || 'asc',
+    });
     const [selectedRows, setSelectedRows] = useState<Role[]>([]);
 
     const handlePageChange = (page: number) => {
-        setIsLoading(true);
-        router.get('/roles', { page, search: searchTerm, ...filters }, {
-            preserveState: true,
-            onFinish: () => setIsLoading(false),
-        });
+        // client-side pagination handled in table
     };
 
     const handleSearch = (search: string) => {
         setSearchTerm(search);
-        router.get('/roles', { search, ...filters }, {
-            preserveState: true,
-            replace: true,
-        });
     };
 
     const handleDelete = async (roleId: number) => {
@@ -90,6 +88,16 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
         }
     };
 
+    const formatDate = (dateString: string | null | undefined) => {
+        if (!dateString) return 'N/A';
+        const d = new Date(dateString);
+        try {
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch {
+            return 'N/A';
+        }
+    };
+
     const columns: ColumnDef<Role>[] = [
         {
             accessorKey: 'name',
@@ -101,11 +109,13 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
                     </div>
                     <div className="flex flex-col">
                         <span className="font-medium text-sm capitalize">
-                            {row.original.name.replace(/_/g, ' ')}
+                            {row.original.label || row.original.name.replace(/_/g, ' ')}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            {row.original.label || 'No description'}
-                        </span>
+                        {row.original.description && (
+                            <span className="text-xs text-muted-foreground">
+                                {row.original.description}
+                            </span>
+                        )}
                     </div>
                 </div>
             ),
@@ -149,7 +159,7 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
             cell: ({ row }) => (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="h-3 w-3" />
-                    {new Date(row.original.created_at!).toLocaleDateString()}
+                    {formatDate(row.original.created_at)}
                 </div>
             ),
             size: 120,
@@ -183,102 +193,105 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Roles & Permissions" />
 
-            <PageHeader
-                title="Roles & Permissions"
-                description="Manage user roles and their permissions"
-                icon={Shield}
-                actions={
-                    <Button asChild className="shadow-sm">
-                        <Link href="/roles/create">
-                            <Plus className="mr-2 h-4 w-4" />
-                            Create Role
-                        </Link>
-                    </Button>
-                }
-            />
-
-            {/* Stats Overview */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-                <StatsCard
-                    title="Total Roles"
-                    value={stats.total.toLocaleString()}
+            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+                <PageHeader
+                    title="Roles & Permissions"
+                    description="Manage user roles and their permissions"
                     icon={Shield}
-                    description="All system roles"
-                    className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
-                />
-                <StatsCard
-                    title="Assigned Users"
-                    value={stats.total_users.toLocaleString()}
-                    icon={Users}
-                    description="Users with roles"
-                    className="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
-                />
-                <StatsCard
-                    title="Total Permissions"
-                    value={stats.total_permissions.toLocaleString()}
-                    icon={Key}
-                    description="Available permissions"
-                    className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
-                />
-                <StatsCard
-                    title="Default Guard"
-                    value="Web"
-                    description="Primary guard"
-                    className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
-                />
-            </div>
-
-            {/* Data Table Section */}
-            <div className="bg-white rounded-lg border shadow-sm">
-                <GenericDataTable
-                    columns={columns}
-                    data={roles.data}
-                    searchKey="name"
-                    searchPlaceholder="Search roles by name..."
-                    filters={
-                        <div className="flex items-center gap-2">
-                            <RoleFilters currentFilters={filters} />
-                            <RoleBulkActions
-                                selectedRows={selectedRows}
-                                onBulkDelete={handleBulkDelete}
-                            />
-                        </div>
-                    }
-                    onRowSelectionChange={setSelectedRows}
-                    isLoading={isLoading}
-                    pagination={{
-                        currentPage: roles.current_page,
-                        lastPage: roles.last_page,
-                        perPage: roles.per_page,
-                        total: roles.total,
-                        onPageChange: handlePageChange,
-                    }}
-                    onRowClick={(role) => router.visit(`/roles/${role.id}`)}
-                    className="p-6"
-                />
-            </div>
-
-            {/* Empty State Handling */}
-            {roles.data.length === 0 && !isLoading && (
-                <div className="text-center py-12">
-                    <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-semibold">No roles found</h3>
-                    <p className="text-muted-foreground mt-2">
-                        {searchTerm || Object.values(filters).some(Boolean)
-                            ? "Try adjusting your search or filters to find what you're looking for."
-                            : "Get started by creating your first role."
-                        }
-                    </p>
-                    {!searchTerm && !Object.values(filters).some(Boolean) && (
-                        <Button asChild className="mt-4">
+                    actions={
+                        <Button asChild className="shadow-sm">
                             <Link href="/roles/create">
                                 <Plus className="mr-2 h-4 w-4" />
                                 Create Role
                             </Link>
                         </Button>
-                    )}
+                    }
+                />
+
+                {/* Stats Overview */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <StatsCard
+                        title="Total Roles"
+                        value={stats.total.toLocaleString()}
+                        icon={Shield}
+                        description="All system roles"
+                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:bg-gradient-to-br dark:from-blue-900 dark:to-blue-800 dark:border-blue-700"
+                    />
+                    <StatsCard
+                        title="Assigned Users"
+                        value={stats.total_users.toLocaleString()}
+                        icon={Users}
+                        description="Users with roles"
+                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:bg-gradient-to-br dark:from-green-900 dark:to-green-800 dark:border-green-700"
+                    />
+                    <StatsCard
+                        title="Total Permissions"
+                        value={stats.total_permissions.toLocaleString()}
+                        icon={Key}
+                        description="Available permissions"
+                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:bg-gradient-to-br dark:from-purple-900 dark:to-purple-800 dark:border-purple-700"
+                    />
+                    <StatsCard
+                        title="Default Guard"
+                        value="Web"
+                        icon={ShieldOffIcon}
+                        description="Primary guard"
+                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:bg-gradient-to-br dark:from-orange-900 dark:to-orange-800 dark:border-orange-700"
+                    />
                 </div>
-            )}
+
+                {/* Data Table Section */}
+                <div className="bg-white rounded-lg border shadow-sm">
+                    <GenericDataTable
+                        columns={columns}
+                        data={roles.data}
+                        searchKey="name"
+                        searchPlaceholder="Search roles by name..."
+                        onSearch={handleSearch}
+                        searchValue={searchTerm}
+                        clientSide
+                        initialPerPage={roles.per_page}
+                        clientFilters={clientFilters}
+                        filters={
+                            <div className="flex items-center gap-2">
+                                <RoleFilters currentFilters={clientFilters} onChange={(f) => setClientFilters(prev => ({ ...prev, ...f }))} />
+                                <RoleBulkActions
+                                    selectedRows={selectedRows}
+                                    onBulkDelete={handleBulkDelete}
+                                />
+                            </div>
+                        }
+                        enableRowSelection
+                        onRowSelectionChange={setSelectedRows}
+                        isLoading={isLoading}
+                        getRowId={(row) => String((row as Role).id)}
+                        onRowClick={(role) => router.visit(`/roles/${role.id}`)}
+                        className="p-6"
+                    />
+                </div>
+
+                {/* Empty State Handling */}
+                {roles.data.length === 0 && !isLoading && (
+                    <div className="text-center py-12">
+                        <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <h3 className="mt-4 text-lg font-semibold">No roles found</h3>
+                        <p className="text-muted-foreground mt-2">
+                            {searchTerm || Object.values(filters).some(Boolean)
+                                ? "Try adjusting your search or filters to find what you're looking for."
+                                : "Get started by creating your first role."
+                            }
+                        </p>
+                        {!searchTerm && !Object.values(filters).some(Boolean) && (
+                            <Button asChild className="mt-4">
+                                <Link href="/roles/create">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Create Role
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
+                )}
+            </div>
         </AppLayout>
     );
 }

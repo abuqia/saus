@@ -10,7 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Spatie\Permission\Models\Role;
+use Illuminate\Support\Facades\Schema;
+use App\Models\Role;
 use Spatie\Permission\Models\Permission;
 
 class RoleController extends Controller
@@ -126,11 +127,23 @@ class RoleController extends Controller
     public function show(Role $role): Response
     {
         $role->loadCount(['users', 'permissions']);
-        $role->load(['permissions' => function ($query) {
-            $query->select('id', 'name', 'module')->limit(20);
-        }, 'users' => function ($query) {
-            $query->select('id', 'name', 'email', 'status')->limit(10);
-        }]);
+
+        $moduleColumn = Schema::hasColumn('permissions', 'module')
+            ? 'module'
+            : (Schema::hasColumn('permissions', 'group') ? 'group' : null);
+
+        $role->load([
+            'permissions' => function ($query) use ($moduleColumn) {
+                $columns = ['id', 'name'];
+                if ($moduleColumn) {
+                    $columns[] = $moduleColumn;
+                }
+                $query->select($columns)->limit(20);
+            },
+            'users' => function ($query) {
+                $query->select('id', 'name', 'email', 'status')->limit(10);
+            }
+        ]);
 
         return Inertia::render('roles/show', [
             'role' => [
@@ -146,7 +159,7 @@ class RoleController extends Controller
                 'permissions' => $role->permissions->map(fn($permission) => [
                     'id' => $permission->id,
                     'name' => $permission->name,
-                    'module' => $permission->module,
+                    'module' => $moduleColumn ? ($permission->{$moduleColumn} ?? 'general') : 'general',
                 ]),
                 'users' => $role->users->map(fn($user) => [
                     'id' => $user->id,

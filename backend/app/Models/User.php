@@ -43,6 +43,12 @@ class User extends Authenticatable implements MustVerifyEmail
         'two_factor_enabled',
         'last_login_at',
         'last_login_ip',
+        'google_id',
+        'google_token',
+        'google_refresh_token',
+        'google_expires_in',
+        'facebook_id',
+        'github_id',
     ];
 
     /**

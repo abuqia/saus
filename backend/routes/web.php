@@ -8,6 +8,7 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\ThemeController;
+use App\Http\Controllers\Auth\SocialAuthController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Lab404\Impersonate\Controllers\ImpersonateController;
@@ -18,6 +19,24 @@ Route::get('/', function () {
         'canRegister' => Features::enabled(Features::registration()),
     ]);
 })->name('home');
+
+// ============================================
+// SOCIAL AUTHENTICATION
+// ============================================
+// Social Auth Routes
+Route::get('/auth/google', [SocialAuthController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('/auth/google/callback', [SocialAuthController::class, 'handleGoogleCallback']);
+
+// Popup window social auth (Recommended approach)
+Route::get('/auth/google/popup', [SocialAuthController::class, 'getGoogleAuthUrl'])->name('auth.google.popup');
+Route::get('/auth/google/popup/callback', [SocialAuthController::class, 'handleGooglePopupCallback'])->name('auth.google.popup.callback');
+
+// Social Connect Routes (harus login)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/auth/google/connect', [SocialAuthController::class, 'connectGoogle'])->name('auth.google.connect');
+    Route::get('/auth/google/connect/callback', [SocialAuthController::class, 'handleGoogleConnectCallback']);
+    Route::post('/auth/google/disconnect', [SocialAuthController::class, 'disconnectGoogle'])->name('auth.google.disconnect');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {

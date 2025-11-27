@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
+import GoogleLoginButton from '@/components/auth/google-login-button';
 
 export default function Register() {
     const [isVisible, setIsVisible] = useState(false);
@@ -29,6 +30,24 @@ export default function Register() {
             <div className={`w-full max-w-md mx-auto transform transition-all duration-500 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}>
                 {/* Register Form */}
                 <div className={`bg-white/80 backdrop-blur-sm border border-[#19140015] rounded-2xl p-8 shadow-lg dark:bg-[#161615]/80 dark:border-[#3E3E3A] transform transition-all duration-500 delay-200 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}>
+
+                    {/* Social Register Section */}
+                    <div className="mb-6">
+                        <GoogleLoginButton text="Sign up with Google" />
+
+                        {/* Divider */}
+                        <div className="relative my-6">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-[#19140015] dark:border-[#3E3E3A]"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="px-2 bg-white/80 dark:bg-[#161615]/80 text-[#706f6c] dark:text-[#A1A09A]">
+                                    Or sign up with email
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     <Form
                         {...store.form()}
                         resetOnSuccess={['password', 'password_confirmation']}
@@ -142,6 +161,24 @@ export default function Register() {
                                         <InputError
                                             message={errors.password_confirmation}
                                         />
+                                    </div>
+
+                                    {/* Terms Agreement */}
+                                    <div className="text-xs text-[#706f6c] dark:text-[#A1A09A] text-center">
+                                        By signing up, you agree to our{' '}
+                                        <TextLink
+                                            href="/terms"
+                                            className="text-[#F53003] hover:text-[#FF750F] dark:text-[#FF4433] dark:hover:text-[#FF8866]"
+                                        >
+                                            Terms of Service
+                                        </TextLink>{' '}
+                                        and{' '}
+                                        <TextLink
+                                            href="/privacy"
+                                            className="text-[#F53003] hover:text-[#FF750F] dark:text-[#FF4433] dark:hover:text-[#FF8866]"
+                                        >
+                                            Privacy Policy
+                                        </TextLink>
                                     </div>
 
                                     {/* Submit Button */}

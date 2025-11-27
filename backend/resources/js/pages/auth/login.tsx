@@ -12,6 +12,7 @@ import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 import { Form, Head } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
+import GoogleLoginButton from '@/components/auth/google-login-button';
 
 interface LoginProps {
     status?: string;
@@ -41,6 +42,24 @@ export default function Login({
 
                 {/* Login Form */}
                 <div className={`bg-white/80 backdrop-blur-sm border border-[#19140015] rounded-2xl p-8 shadow-lg dark:bg-[#161615]/80 dark:border-[#3E3E3A] transform transition-all duration-500 delay-200 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}>
+
+                    {/* Social Login Section */}
+                    <div className="mb-6">
+                        <GoogleLoginButton />
+
+                        {/* Divider */}
+                        <div className="relative my-6">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-[#19140015] dark:border-[#3E3E3A]"></div>
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="px-2 bg-white/80 dark:bg-[#161615]/80 text-[#706f6c] dark:text-[#A1A09A]">
+                                    Or continue with email
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     <Form
                         {...store.form()}
                         resetOnSuccess={['password']}

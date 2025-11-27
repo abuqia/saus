@@ -32,6 +32,10 @@ class RoleAndPermissionSeeder extends Seeder
             'roles.edit',
             'roles.delete',
             'permissions.manage',
+            'permissions.view',
+            'permissions.create',
+            'permissions.edit',
+            'permissions.delete',
 
             // Tenant Management
             'tenants.view',
@@ -98,12 +102,17 @@ class RoleAndPermissionSeeder extends Seeder
             'activity.export',
         ];
 
-        // Create all permissions
-        foreach ($permissions as $permission) {
-            Permission::firstOrCreate([
-                'name' => $permission,
+        // Create all permissions with description/backfill
+        foreach ($permissions as $permissionName) {
+            $perm = Permission::firstOrCreate([
+                'name' => $permissionName,
                 'guard_name' => 'web',
             ]);
+            $desc = $this->describePermission($permissionName);
+            if ($perm->description !== $desc) {
+                $perm->description = $desc;
+                $perm->save();
+            }
         }
 
         // ============================================
@@ -143,6 +152,13 @@ class RoleAndPermissionSeeder extends Seeder
 
             // Activity
             'activity.view',
+
+            // Permissions
+            'permissions.manage',
+            'permissions.view',
+            'permissions.create',
+            'permissions.edit',
+            'permissions.delete',
         ]);
 
         // ============================================
@@ -327,5 +343,13 @@ class RoleAndPermissionSeeder extends Seeder
                 ['User', $user->permissions->count()],
             ]
         );
+    }
+
+    private function describePermission(string $name): string
+    {
+        $parts = explode('.', $name);
+        $model = ucfirst(str_replace('_', ' ', $parts[0] ?? 'General'));
+        $action = ucfirst(str_replace('_', ' ', $parts[1] ?? 'Manage'));
+        return $action . ' ' . $model;
     }
 }

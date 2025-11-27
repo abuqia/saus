@@ -103,12 +103,12 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
             accessorKey: 'name',
             header: 'Role',
             cell: ({ row }) => (
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Shield className="h-5 w-5 text-primary" />
+                <div className="flex gap-3 items-center">
+                    <div className="flex justify-center items-center w-10 h-10 rounded-lg bg-primary/10">
+                        <Shield className="w-5 h-5 text-primary" />
                     </div>
                     <div className="flex flex-col">
-                        <span className="font-medium text-sm capitalize">
+                        <span className="text-sm font-medium capitalize">
                             {row.original.label || row.original.name.replace(/_/g, ' ')}
                         </span>
                         {row.original.description && (
@@ -125,8 +125,8 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
             accessorKey: 'users_count',
             header: 'Users',
             cell: ({ row }) => (
-                <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                <div className="flex gap-2 items-center">
+                    <Users className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{row.original.users_count || 0}</span>
                 </div>
             ),
@@ -136,8 +136,8 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
             accessorKey: 'permissions_count',
             header: 'Permissions',
             cell: ({ row }) => (
-                <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4 text-muted-foreground" />
+                <div className="flex gap-2 items-center">
+                    <Key className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium">{row.original.permissions_count || 0}</span>
                 </div>
             ),
@@ -157,8 +157,8 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
             accessorKey: 'created_at',
             header: 'Created',
             cell: ({ row }) => (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
+                <div className="flex gap-2 items-center text-sm text-muted-foreground">
+                    <Calendar className="w-3 h-3" />
                     {formatDate(row.original.created_at)}
                 </div>
             ),
@@ -193,7 +193,7 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Roles & Permissions" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex overflow-x-auto flex-col flex-1 gap-4 p-4 h-full rounded-xl">
                 <PageHeader
                     title="Roles & Permissions"
                     description="Manage user roles and their permissions"
@@ -201,7 +201,7 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
                     actions={
                         <Button asChild className="shadow-sm">
                             <Link href="/roles/create">
-                                <Plus className="mr-2 h-4 w-4" />
+                                <Plus className="mr-2 w-4 h-4" />
                                 Create Role
                             </Link>
                         </Button>
@@ -215,33 +215,33 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
                         value={stats.total.toLocaleString()}
                         icon={Shield}
                         description="All system roles"
-                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:bg-gradient-to-br dark:from-blue-900 dark:to-blue-800 dark:border-blue-700"
+                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:bg-gradient-to-br dark:from-blue-950 dark:to-blue-900 dark:border-blue-800"
                     />
                     <StatsCard
                         title="Assigned Users"
                         value={stats.total_users.toLocaleString()}
                         icon={Users}
                         description="Users with roles"
-                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:bg-gradient-to-br dark:from-green-900 dark:to-green-800 dark:border-green-700"
+                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:bg-gradient-to-br dark:from-green-950 dark:to-green-900 dark:border-green-800"
                     />
                     <StatsCard
                         title="Total Permissions"
                         value={stats.total_permissions.toLocaleString()}
                         icon={Key}
                         description="Available permissions"
-                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:bg-gradient-to-br dark:from-purple-900 dark:to-purple-800 dark:border-purple-700"
+                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:bg-gradient-to-br dark:from-purple-950 dark:to-purple-900 dark:border-purple-800"
                     />
                     <StatsCard
                         title="Default Guard"
                         value="Web"
                         icon={ShieldOffIcon}
                         description="Primary guard"
-                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:bg-gradient-to-br dark:from-orange-900 dark:to-orange-800 dark:border-orange-700"
+                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:bg-gradient-to-br dark:from-orange-950 dark:to-orange-900 dark:border-orange-800"
                     />
                 </div>
 
                 {/* Data Table Section */}
-                <div className="bg-white rounded-lg border shadow-sm">
+                <div className="rounded-lg border shadow-sm bg-card">
                     <GenericDataTable
                         columns={columns}
                         data={roles.data}
@@ -253,7 +253,7 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
                         initialPerPage={roles.per_page}
                         clientFilters={clientFilters}
                         filters={
-                            <div className="flex items-center gap-2">
+                            <div className="flex gap-2 items-center">
                                 <RoleFilters currentFilters={clientFilters} onChange={(f) => setClientFilters(prev => ({ ...prev, ...f }))} />
                                 <RoleBulkActions
                                     selectedRows={selectedRows}
@@ -272,10 +272,10 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
 
                 {/* Empty State Handling */}
                 {roles.data.length === 0 && !isLoading && (
-                    <div className="text-center py-12">
-                        <Shield className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <div className="py-12 text-center">
+                        <Shield className="mx-auto w-12 h-12 text-muted-foreground" />
                         <h3 className="mt-4 text-lg font-semibold">No roles found</h3>
-                        <p className="text-muted-foreground mt-2">
+                        <p className="mt-2 text-muted-foreground">
                             {searchTerm || Object.values(filters).some(Boolean)
                                 ? "Try adjusting your search or filters to find what you're looking for."
                                 : "Get started by creating your first role."
@@ -284,7 +284,7 @@ export default function RolesIndex({ roles, filters, stats }: RolesPageProps) {
                         {!searchTerm && !Object.values(filters).some(Boolean) && (
                             <Button asChild className="mt-4">
                                 <Link href="/roles/create">
-                                    <Plus className="mr-2 h-4 w-4" />
+                                    <Plus className="mr-2 w-4 h-4" />
                                     Create Role
                                 </Link>
                             </Button>

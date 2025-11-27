@@ -10,16 +10,17 @@ use Inertia\Response;
 use Spatie\Permission\Models\Permission;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\QueryBuilder;
+use Illuminate\Support\Facades\Schema;
 
 class PermissionController extends Controller
 {
     public function __construct()
     {
         $this->middleware(['auth', 'verified']);
-        $this->middleware('permission:view_permissions')->only(['index', 'show']);
-        $this->middleware('permission:create_permissions')->only(['create', 'store']);
-        $this->middleware('permission:edit_permissions')->only(['edit', 'update']);
-        $this->middleware('permission:delete_permissions')->only('destroy');
+        $this->middleware('permission:permissions.view')->only(['index', 'show']);
+        $this->middleware('permission:permissions.create')->only(['create', 'store']);
+        $this->middleware('permission:permissions.edit')->only(['edit', 'update']);
+        $this->middleware('permission:permissions.delete')->only('destroy');
     }
 
     /**
@@ -29,60 +30,44 @@ class PermissionController extends Controller
     {
         $filters = [
             'search' => $request->string('search')->toString(),
-            'module' => $request->string('module')->toString(),
+            'guard_name' => $request->string('guard_name')->toString(),
         ];
 
-        $query = QueryBuilder::for(Permission::class)
-            ->allowedFilters([
-                AllowedFilter::partial('name'),
-                AllowedFilter::exact('group'),
-            ])
-            ->allowedSorts(['name', 'created_at'])
-            ->withCount(['roles', 'users']);
+        $permissions = Permission::query()
+            ->withCount(['roles'])
+            ->get();
 
-        if (!empty($filters['module']) && $filters['module'] !== 'all') {
-            $query->where('group', $filters['module']);
-        }
-        if (!empty($filters['search'])) {
-            $query->where('name', 'like', '%' . $filters['search'] . '%');
-        }
+        $data = $permissions->map(fn($perm) => [
+            'id' => $perm->id,
+            'name' => $perm->name,
+            'guard_name' => $perm->guard_name,
+            'description' => $perm->description,
+            'created_at' => optional($perm->created_at)->toDateTimeString(),
+            'roles_count' => $perm->roles_count,
+        ])->values();
 
-        $permissions = $query->get();
-
-        $modules = Permission::query()
-            ->select('group')
-            ->distinct()
-            ->pluck('group')
-            ->filter()
-            ->values();
-
-        $groupedPermissions = $permissions
-            ->groupBy(fn($p) => $p->group ?? 'general')
-            ->map(fn($items) => [
-                'count' => $items->count(),
-                'permissions' => $items->map(fn($perm) => [
-                    'id' => $perm->id,
-                    'name' => $perm->name,
-                    'roles_count' => $perm->roles_count,
-                    'users_count' => $perm->users_count,
-                    'created_at' => $perm->created_at->toDateTimeString(),
-                ])->values(),
-            ])
-            ->toArray();
-
-        $statistics = [
-            'total' => Permission::count(),
-            'modules' => $modules->count(),
+        $stats = [
+            'total' => $permissions->count(),
+            'web' => $permissions->where('guard_name', 'web')->count(),
+            'api' => $permissions->where('guard_name', 'api')->count(),
+            'unused' => $permissions->filter(fn($p) => $p->roles_count === 0)->count(),
         ];
 
         return Inertia::render('permissions/index', [
-            'groupedPermissions' => $groupedPermissions,
+            'permissions' => [
+                'data' => $data,
+                'meta' => [
+                    'per_page' => 20,
+                    'total' => $stats['total'],
+                ],
+            ],
             'filters' => [
                 'search' => $filters['search'] ?? null,
-                'module' => $filters['module'] ?? null,
+                'guard_name' => $filters['guard_name'] ?? null,
+                'sort_by' => 'name',
+                'sort_direction' => 'asc',
             ],
-            'modules' => $modules,
-            'statistics' => $statistics,
+            'stats' => $stats,
         ]);
     }
 
@@ -91,12 +76,25 @@ class PermissionController extends Controller
      */
     public function create(): Response
     {
-        $modules = Permission::query()
-            ->select('group')
-            ->distinct()
-            ->pluck('group')
-            ->filter()
-            ->values();
+        $groupColumn = Schema::hasColumn('permissions', 'group')
+            ? 'group'
+            : (Schema::hasColumn('permissions', 'module') ? 'module' : null);
+
+        if ($groupColumn) {
+            $modules = Permission::query()
+                ->select($groupColumn)
+                ->distinct()
+                ->pluck($groupColumn)
+                ->filter()
+                ->values();
+        } else {
+            $modules = Permission::query()
+                ->pluck('name')
+                ->map(fn($n) => explode('.', $n)[0])
+                ->unique()
+                ->filter()
+                ->values();
+        }
 
         return Inertia::render('permissions/create', [
             'modules' => $modules,
@@ -108,12 +106,29 @@ class PermissionController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:permissions,name'],
-            'group' => ['nullable', 'string', 'max:255'],
-        ]);
+        $groupColumn = Schema::hasColumn('permissions', 'group')
+            ? 'group'
+            : (Schema::hasColumn('permissions', 'module') ? 'module' : null);
 
-        $permission = Permission::create($validated);
+        $rules = [
+            'name' => ['required', 'string', 'max:255', 'unique:permissions,name'],
+            'description' => ['nullable', 'string'],
+        ];
+        if ($groupColumn) {
+            $rules[$groupColumn] = ['nullable', 'string', 'max:255'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $data = ['name' => $validated['name']];
+        if ($groupColumn && isset($validated[$groupColumn])) {
+            $data[$groupColumn] = $validated[$groupColumn];
+        }
+        if (isset($validated['description'])) {
+            $data['description'] = $validated['description'];
+        }
+
+        $permission = Permission::create($data);
 
         activity()
             ->causedBy(auth()->user())
@@ -142,12 +157,25 @@ class PermissionController extends Controller
      */
     public function edit(Permission $permission): Response
     {
-        $modules = Permission::query()
-            ->select('group')
-            ->distinct()
-            ->pluck('group')
-            ->filter()
-            ->values();
+        $groupColumn = Schema::hasColumn('permissions', 'group')
+            ? 'group'
+            : (Schema::hasColumn('permissions', 'module') ? 'module' : null);
+
+        if ($groupColumn) {
+            $modules = Permission::query()
+                ->select($groupColumn)
+                ->distinct()
+                ->pluck($groupColumn)
+                ->filter()
+                ->values();
+        } else {
+            $modules = Permission::query()
+                ->pluck('name')
+                ->map(fn($n) => explode('.', $n)[0])
+                ->unique()
+                ->filter()
+                ->values();
+        }
 
         return Inertia::render('permissions/edit', [
             'permission' => $permission,
@@ -160,12 +188,29 @@ class PermissionController extends Controller
      */
     public function update(Request $request, Permission $permission): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:permissions,name,' . $permission->id],
-            'group' => ['nullable', 'string', 'max:255'],
-        ]);
+        $groupColumn = Schema::hasColumn('permissions', 'group')
+            ? 'group'
+            : (Schema::hasColumn('permissions', 'module') ? 'module' : null);
 
-        $permission->update($validated);
+        $rules = [
+            'name' => ['required', 'string', 'max:255', 'unique:permissions,name,' . $permission->id],
+            'description' => ['nullable', 'string'],
+        ];
+        if ($groupColumn) {
+            $rules[$groupColumn] = ['nullable', 'string', 'max:255'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $data = ['name' => $validated['name']];
+        if ($groupColumn && isset($validated[$groupColumn])) {
+            $data[$groupColumn] = $validated[$groupColumn];
+        }
+        if (isset($validated['description'])) {
+            $data['description'] = $validated['description'];
+        }
+
+        $permission->update($data);
 
         activity()
             ->causedBy(auth()->user())
@@ -196,5 +241,109 @@ class PermissionController extends Controller
         return redirect()
             ->route('permissions.index')
             ->with('success', 'Permission deleted successfully');
+    }
+
+    /**
+     * Bulk destroy permissions.
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:permissions,id'],
+        ]);
+
+        $ids = collect($validated['ids'])->unique()->values();
+
+        $deletable = Permission::whereIn('id', $ids)
+            ->whereDoesntHave('roles')
+            ->whereDoesntHave('users')
+            ->pluck('id');
+
+        if ($deletable->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No permissions can be deleted (assigned to roles/users).',
+            ], 422);
+        }
+
+        Permission::whereIn('id', $deletable)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => $deletable->count() . ' permissions deleted successfully.',
+            'deleted_count' => $deletable->count(),
+        ]);
+    }
+
+    /**
+     * Sync permissions from canonical list.
+     */
+    public function sync(Request $request): RedirectResponse
+    {
+        $canonical = [
+            // Users
+            'users.view', 'users.create', 'users.edit', 'users.delete', 'users.impersonate',
+            // Roles & Permissions
+            'roles.view', 'roles.create', 'roles.edit', 'roles.delete',
+            'permissions.manage', 'permissions.view', 'permissions.create', 'permissions.edit', 'permissions.delete',
+            // Tenants
+            'tenants.view', 'tenants.create', 'tenants.edit', 'tenants.delete', 'tenants.settings',
+            // Team
+            'team.view', 'team.invite', 'team.remove', 'team.roles',
+            // Links
+            'links.view', 'links.create', 'links.edit', 'links.delete', 'links.reorder', 'links.analytics',
+            // Pages
+            'pages.view', 'pages.create', 'pages.edit', 'pages.delete', 'pages.publish',
+            // Themes
+            'themes.view', 'themes.apply', 'themes.customize', 'themes.create',
+            // Media
+            'media.view', 'media.upload', 'media.delete',
+            // Analytics
+            'analytics.view', 'analytics.export', 'analytics.advanced',
+            // Settings
+            'settings.view', 'settings.edit', 'settings.system',
+            // Billing
+            'billing.view', 'billing.manage', 'billing.invoices',
+            // API & Integrations
+            'api.access', 'api.manage', 'integrations.view', 'integrations.manage',
+            // Activity Log
+            'activity.view', 'activity.export',
+        ];
+
+        $created = 0; $updated = 0;
+
+        foreach ($canonical as $name) {
+            $desc = $this->describePermission($name);
+            $perm = Permission::where('name', $name)->first();
+            if (!$perm) {
+                Permission::create([
+                    'name' => $name,
+                    'guard_name' => 'web',
+                    'description' => $desc,
+                ]);
+                $created++;
+            } else {
+                if ($desc && $perm->description !== $desc) {
+                    $perm->description = $desc;
+                    $perm->save();
+                    $updated++;
+                }
+            }
+        }
+
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return redirect()
+            ->route('permissions.index')
+            ->with('success', 'Permissions synced successfully');
+    }
+
+    private function describePermission(string $name): string
+    {
+        $parts = explode('.', $name);
+        $model = ucfirst(str_replace('_', ' ', $parts[0] ?? 'General'));
+        $action = ucfirst(str_replace('_', ' ', $parts[1] ?? 'Manage'));
+        return $action . ' ' . $model;
     }
 }

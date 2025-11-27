@@ -54,7 +54,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     // PERMISSION MANAGEMENT
     // ============================================
-    Route::resource('permissions', PermissionController::class)->only(['index', 'store', 'update', 'destroy']);
+    Route::resource('permissions', PermissionController::class)->except(['show']);
     Route::post('permissions/bulk-destroy', [PermissionController::class, 'bulkDestroy'])->name('permissions.bulk-destroy');
     Route::post('permissions/sync', [PermissionController::class, 'sync'])->name('permissions.sync');
 

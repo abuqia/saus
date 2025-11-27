@@ -309,18 +309,41 @@ class RoleController extends Controller
     {
         $role->load('permissions');
 
-        $permissions = Permission::all()->groupBy('module')->map(function ($permissions, $module) use ($role) {
+        $moduleColumn = Schema::hasColumn('permissions', 'module')
+            ? 'module'
+            : (Schema::hasColumn('permissions', 'group') ? 'group' : null);
+
+        $columns = ['id', 'name'];
+        if ($moduleColumn) {
+            $columns[] = $moduleColumn;
+        }
+        if (Schema::hasColumn('permissions', 'label')) {
+            $columns[] = 'label';
+        }
+        if (Schema::hasColumn('permissions', 'description')) {
+            $columns[] = 'description';
+        }
+
+        $allPermissions = Permission::select($columns)->get();
+
+        $grouped = $allPermissions->groupBy(function ($permission) use ($moduleColumn) {
+            return $moduleColumn ? ($permission->{$moduleColumn} ?: 'General') : 'General';
+        });
+
+        $permissions = $grouped->map(function ($permissions, $module) use ($role) {
             return [
                 'module' => $module ?: 'General',
                 'permissions' => $permissions->map(fn($permission) => [
                     'id' => $permission->id,
                     'name' => $permission->name,
-                    'label' => $permission->label,
-                    'description' => $permission->description,
+                    'label' => $permission->label ?? null,
+                    'description' => $permission->description ?? null,
                     'assigned' => $role->permissions->contains('id', $permission->id),
                 ]),
             ];
         })->values();
+
+        $modules = $permissions->pluck('module');
 
         return Inertia::render('roles/permissions', [
             'role' => [
@@ -331,7 +354,7 @@ class RoleController extends Controller
                 'permissions_count' => $role->permissions_count,
             ],
             'permissions' => $permissions,
-            'modules' => Permission::distinct()->pluck('module')->filter()->values(),
+            'modules' => $modules,
         ]);
     }
 

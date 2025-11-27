@@ -1,264 +1,436 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import AppLayout from '@/layouts/app-layout';
 import { PageHeader, StatsCard } from '@/components/page-header';
+import { GenericDataTable } from '@/components/data-table/generic-data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { router, Link, Head, usePage } from '@inertiajs/react';
+import { ColumnDef } from '@tanstack/react-table';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+    Shield,
+    Plus,
+    Calendar,
+    MoreHorizontal,
+    Trash,
+    Key,
+    Users,
+    Folder,
+    Settings,
+} from 'lucide-react';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { router } from '@inertiajs/react';
-import { Lock, Plus, Trash, Search, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
-import { useForm } from '@inertiajs/react';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useEffect, useState } from 'react';
+import type { BreadcrumbItem, PageProps } from '@/types';
+import { toast } from 'sonner';
+import { dashboard } from '@/routes';
+import PermissionController from '@/actions/App/Http/Controllers/PermissionController';
 
 interface Permission {
     id: number;
     name: string;
-    display_name: string;
     guard_name: string;
+    description?: string;
     created_at: string;
+    updated_at: string;
+    roles_count?: number;
 }
 
-interface PermissionGroup {
-    category: string;
-    permissions: Permission[];
-}
-
-interface PageProps {
+interface PermissionsPageProps {
     permissions: {
         data: Permission[];
-        total: number;
+        meta: any;
     };
-    groupedPermissions: PermissionGroup[];
     filters: {
         search?: string;
+        guard_name?: string;
+        sort_by?: string;
+        sort_direction?: string;
     };
     stats: {
         total: number;
-        categories: number;
+        web: number;
+        api: number;
+        unused: number;
     };
 }
 
-export default function PermissionsIndex({ permissions, groupedPermissions, filters, stats }: PageProps) {
+export default function PermissionsIndex({ permissions, filters, stats }: PermissionsPageProps) {
+    const { props } = usePage<any>();
+    const [isLoading, setIsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState(filters.search || '');
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-
-    const { data, setData, post, processing, errors, reset } = useForm({
-        name: '',
-        guard_name: 'web',
+    const [selectedRows, setSelectedRows] = useState<Permission[]>([]);
+    const [clientFilters, setClientFilters] = useState({
+        guard_name: filters.guard_name || '',
+        sort_by: filters.sort_by || 'name',
+        sort_direction: filters.sort_direction || 'asc',
     });
 
-    const handleCreate = (e: React.FormEvent) => {
-        e.preventDefault();
-        post('/permissions', {
-            preserveScroll: true,
-            onSuccess: () => {
-                setIsCreateOpen(false);
-                reset();
+    const handleSearch = (search: string) => {
+        setSearchTerm(search);
+    };
+
+    const handleBulkDelete = async () => {
+        const ids = selectedRows.map(p => p.id).filter(Boolean);
+        if (ids.length === 0) return;
+
+        toast.warning(`Delete ${ids.length} permissions?`, {
+            description: 'This action cannot be undone.',
+            duration: 10000,
+            closeButton: true,
+            action: {
+                label: 'Delete',
+                onClick: async () => {
+                    setIsLoading(true);
+                    try {
+                        const response = await fetch('/permissions/bulk-destroy', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                            },
+                            body: JSON.stringify({ ids }),
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            toast.success(result.message || 'Successfully deleted selected permissions');
+                            setSelectedRows([]);
+                            router.reload({ only: ['permissions'] });
+                        } else {
+                            toast.error(result.message || 'Failed to delete selected permissions');
+                        }
+                    } catch (error) {
+                        toast.error('An error occurred while deleting permissions');
+                    } finally {
+                        setIsLoading(false);
+                    }
+                },
             },
         });
     };
 
-    const handleDelete = (id: number) => {
-        if (confirm('Are you sure you want to delete this permission?')) {
-            router.delete(`/permissions/${id}`, {
-                preserveScroll: true,
-            });
-        }
-    };
-
-    const handleSync = () => {
-        router.post('/permissions/sync', {}, {
+    const handleSyncPermissions = async () => {
+        setIsLoading(true);
+        await router.post('/permissions/sync', {}, {
             preserveScroll: true,
+            onSuccess: (page) => {
+                const msg = (page?.props as any)?.flash?.success || 'Permissions synced successfully';
+                toast.success(msg);
+                router.reload({ only: ['permissions'] });
+            },
+            onError: (errors) => {
+                toast.error('Failed to sync permissions');
+            },
+            onFinish: () => setIsLoading(false),
         });
     };
 
-    const filteredGroups = groupedPermissions.filter(group =>
-        searchTerm === '' ||
-        group.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        group.permissions.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    };
+
+    const getPermissionGroup = (name: string) => {
+        if (name.includes('users.')) return 'Users';
+        if (name.includes('roles.')) return 'Roles';
+        if (name.includes('permissions.')) return 'Permissions';
+        if (name.includes('tenants.')) return 'Tenants';
+        if (name.includes('settings.')) return 'Settings';
+        if (name.includes('themes.')) return 'Themes';
+        return 'General';
+    };
+
+    const getGroupIcon = (group: string) => {
+        switch (group) {
+            case 'Users': return Users;
+            case 'Roles': return Shield;
+            case 'Permissions': return Key;
+            case 'Tenants': return Folder;
+            case 'Settings': return Settings;
+            default: return Shield;
+        }
+    };
+
+    const columns: ColumnDef<Permission>[] = [
+        {
+            accessorKey: 'name',
+            header: 'Permission',
+            cell: ({ row }) => {
+                const group = getPermissionGroup(row.original.name);
+                const GroupIcon = getGroupIcon(group);
+                return (
+                    <div className="flex gap-3 items-center">
+                        <div className="flex justify-center items-center w-8 h-8 rounded-lg bg-primary/10">
+                            <GroupIcon className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium">{row.original.name}</span>
+                            <div className="flex gap-2 items-center mt-1">
+                                <Badge variant="outline" className="text-xs capitalize">
+                                    {group}
+                                </Badge>
+                                {row.original.description && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {row.original.description}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            },
+            size: 300,
+        },
+        {
+            accessorKey: 'guard_name',
+            header: 'Guard',
+            cell: ({ row }) => (
+                <Badge variant={row.original.guard_name === 'web' ? 'default' : 'secondary'} className="capitalize">
+                    {row.original.guard_name}
+                </Badge>
+            ),
+            size: 100,
+        },
+        {
+            accessorKey: 'roles_count',
+            header: 'Roles',
+            cell: ({ row }) => (
+                <div className="text-center">
+                    <span className="text-sm font-semibold">
+                        {row.original.roles_count || 0}
+                    </span>
+                </div>
+            ),
+            size: 80,
+        },
+        {
+            accessorKey: 'created_at',
+            header: 'Created',
+            cell: ({ row }) => (
+                <div className="flex gap-2 items-center text-sm text-muted-foreground">
+                    <Calendar className="w-3 h-3" />
+                    {formatDate(row.original.created_at)}
+                </div>
+            ),
+            size: 130,
+        },
+        {
+            id: 'actions',
+            header: 'Actions',
+            cell: ({ row }) => (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <Link href={`/permissions/${row.original.id}/edit`}>
+                                Edit Permission
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => {
+                                toast.warning(`Delete permission "${row.original.name}"?`, {
+                                    action: {
+                                        label: 'Delete',
+                                        onClick: () => {
+                                            router.delete(`/permissions/${row.original.id}`, {
+                                                preserveScroll: true,
+                                                onSuccess: () => toast.success('Permission deleted'),
+                                            });
+                                        },
+                                    },
+                                });
+                            }}
+                        >
+                            <Trash className="mr-2 w-4 h-4" />
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            ),
+            size: 80,
+            enableSorting: false,
+        },
+    ];
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        {
+            title: 'Dashboard',
+            href: dashboard().url,
+        },
+        {
+            title: 'Permissions',
+            href: PermissionController.index().url,
+        },
+    ];
 
     return (
-        <>
-            <PageHeader
-                title="Permissions"
-                description="Manage system permissions and access control"
-                icon={Lock}
-                actions={
-                    <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleSync}>
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Sync Cache
-                        </Button>
-                        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Create Permission
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <form onSubmit={handleCreate}>
-                                    <DialogHeader>
-                                        <DialogTitle>Create New Permission</DialogTitle>
-                                        <DialogDescription>
-                                            Add a new permission to the system. Use dot notation (e.g., users.create)
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="grid gap-4 py-4">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="name">Permission Name</Label>
-                                            <Input
-                                                id="name"
-                                                placeholder="e.g., users.create"
-                                                value={data.name}
-                                                onChange={(e) => setData('name', e.target.value)}
-                                            />
-                                            {errors.name && (
-                                                <p className="text-sm text-destructive">{errors.name}</p>
-                                            )}
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="guard_name">Guard Name</Label>
-                                            <Input
-                                                id="guard_name"
-                                                value={data.guard_name}
-                                                onChange={(e) => setData('guard_name', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                                            Cancel
-                                        </Button>
-                                        <Button type="submit" disabled={processing}>
-                                            Create Permission
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
-                }
-            />
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Permissions" />
 
-            {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-2 mb-6">
-                <StatsCard
-                    title="Total Permissions"
-                    value={stats.total}
-                    icon={Lock}
+            <div className="flex overflow-x-auto flex-col flex-1 gap-4 p-4 h-full rounded-xl">
+                <PageHeader
+                    title="Permission Management"
+                    description="Manage system permissions and access controls"
+                    icon={Shield}
+                    actions={
+                        <div className="flex gap-2 items-center">
+                            <Button
+                                variant="outline"
+                                onClick={handleSyncPermissions}
+                                disabled={isLoading}
+                            >
+                                <Settings className="mr-2 w-4 h-4" />
+                                Sync Permissions
+                            </Button>
+                            <Button asChild className="shadow-sm">
+                                <Link href="/permissions/create">
+                                    <Plus className="mr-2 w-4 h-4" />
+                                    Add Permission
+                                </Link>
+                            </Button>
+                        </div>
+                    }
                 />
-                <StatsCard
-                    title="Categories"
-                    value={stats.categories}
-                    description="Permission groups"
-                />
-            </div>
 
-            {/* Search */}
-            <div className="mb-6">
-                <div className="relative max-w-sm">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search permissions..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9"
+                {/* Stats Overview */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <StatsCard
+                        title="Total Permissions"
+                        value={stats.total.toLocaleString()}
+                        icon={Shield}
+                        description="All system permissions"
+                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:bg-gradient-to-br dark:from-blue-950 dark:to-blue-900 dark:border-blue-800"
+                    />
+                    <StatsCard
+                        title="Web Guard"
+                        value={stats.web.toLocaleString()}
+                        icon={Users}
+                        description="Web interface permissions"
+                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:bg-gradient-to-br dark:from-green-950 dark:to-green-900 dark:border-green-800"
+                    />
+                    <StatsCard
+                        title="API Guard"
+                        value={stats.api.toLocaleString()}
+                        icon={Key}
+                        description="API access permissions"
+                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:bg-gradient-to-br dark:from-purple-950 dark:to-purple-900 dark:border-purple-800"
+                    />
+                    <StatsCard
+                        title="Unused"
+                        value={stats.unused.toLocaleString()}
+                        icon={Shield}
+                        description="Not assigned to any role"
+                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:bg-gradient-to-br dark:from-orange-950 dark:to-orange-900 dark:border-orange-800"
                     />
                 </div>
-            </div>
 
-            {/* Grouped Permissions */}
-            <div className="grid gap-6">
-                {filteredGroups.map((group) => (
-                    <Card key={group.category}>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="capitalize">{group.category}</CardTitle>
-                                    <CardDescription>
-                                        {group.permissions.length} permissions
-                                    </CardDescription>
+                {/* Data Table Section */}
+                <div className="rounded-lg border shadow-sm bg-card">
+                    <GenericDataTable
+                        columns={columns}
+                        data={permissions.data}
+                        searchKey="name"
+                        searchPlaceholder="Search permissions by name..."
+                        onSearch={handleSearch}
+                        searchValue={searchTerm}
+                        filters={
+                            <div className="flex gap-2 items-center">
+                                <div className="flex gap-2 items-center">
+                                    <select
+                                        value={clientFilters.guard_name}
+                                        onChange={(e) => setClientFilters(prev => ({ ...prev, guard_name: e.target.value }))}
+                                        className="px-3 py-1 h-9 text-sm bg-transparent rounded-md border shadow-sm border-input"
+                                    >
+                                        <option value="">All Guards</option>
+                                        <option value="web">Web</option>
+                                        <option value="api">API</option>
+                                    </select>
                                 </div>
-                                <Badge variant="secondary">{group.category}</Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Name</TableHead>
-                                        <TableHead>Display Name</TableHead>
-                                        <TableHead>Guard</TableHead>
-                                        <TableHead>Created</TableHead>
-                                        <TableHead className="w-[100px]">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {group.permissions.map((permission) => (
-                                        <TableRow key={permission.id}>
-                                            <TableCell>
-                                                <code className="text-sm">{permission.name}</code>
-                                            </TableCell>
-                                            <TableCell>{permission.display_name}</TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">{permission.guard_name}</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {new Date(permission.created_at).toLocaleDateString()}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => handleDelete(permission.id)}
-                                                >
-                                                    <Trash className="h-4 w-4 text-destructive" />
+                                {selectedRows.length > 0 && (
+                                    <div className="flex gap-2 items-center">
+                                        <span className="text-sm text-muted-foreground">
+                                            {selectedRows.length} selected
+                                        </span>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline" size="sm" className="h-9">
+                                                    <MoreHorizontal className="mr-2 w-4 h-4" />
+                                                    Actions
                                                 </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={handleBulkDelete} className="text-destructive">
+                                                    <Trash className="mr-2 w-4 h-4" />
+                                                    Delete Selected
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                )}
+                            </div>
+                        }
+                        isLoading={isLoading}
+                        clientSide
+                        initialPerPage={permissions.meta?.per_page || 20}
+                        clientFilters={clientFilters}
+                        onRowClick={(permission) => router.visit(`/permissions/${permission.id}/edit`)}
+                        className="p-6"
+                        enableRowSelection
+                        onSelectionChange={setSelectedRows}
+                        getRowId={(row) => String(row.id)}
+                    />
+                </div>
 
-            {filteredGroups.length === 0 && (
-                <Card>
-                    <CardContent className="flex items-center justify-center p-12">
-                        <div className="text-center">
-                            <Lock className="mx-auto h-12 w-12 text-muted-foreground" />
-                            <h3 className="mt-4 text-lg font-semibold">No permissions found</h3>
-                            <p className="mt-2 text-sm text-muted-foreground">
-                                Try adjusting your search or create a new permission.
-                            </p>
+                {/* Empty State Handling */}
+                {permissions.data.length === 0 && !isLoading && (
+                    <div className="py-12 text-center">
+                        <Shield className="mx-auto w-12 h-12 text-muted-foreground" />
+                        <h3 className="mt-4 text-lg font-semibold">No permissions found</h3>
+                        <p className="mt-2 text-muted-foreground">
+                            {searchTerm || clientFilters.guard_name
+                                ? "Try adjusting your search or filters to find what you're looking for."
+                                : "Get started by creating your first permission or syncing from codebase."
+                            }
+                        </p>
+                        <div className="flex gap-2 justify-center mt-4">
+                            <Button
+                                variant="outline"
+                                onClick={handleSyncPermissions}
+                                disabled={isLoading}
+                            >
+                                <Settings className="mr-2 w-4 h-4" />
+                                Sync Permissions
+                            </Button>
+                            {!searchTerm && !clientFilters.guard_name && (
+                                <Button asChild>
+                                    <Link href="/permissions/create">
+                                        <Plus className="mr-2 w-4 h-4" />
+                                        Add Permission
+                                    </Link>
+                                </Button>
+                            )}
                         </div>
-                    </CardContent>
-                </Card>
-            )}
-        </>
+                    </div>
+                )}
+            </div>
+        </AppLayout>
     );
 }
-
-PermissionsIndex.layout = (page: React.ReactNode) => <AppLayout children={page} />;

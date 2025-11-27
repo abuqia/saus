@@ -136,8 +136,8 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
             accessorKey: 'name',
             header: 'User',
             cell: ({ row }) => (
-                <div className="flex items-center gap-3">
-                    <Avatar className="h-9 w-9">
+                <div className="flex gap-3 items-center">
+                    <Avatar className="w-9 h-9">
                         <AvatarImage src={row.original.avatar} alt={row.original.name} />
                         <AvatarFallback className="text-sm font-medium">
                             {row.original.name
@@ -149,9 +149,9 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                         </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col">
-                        <span className="font-medium text-sm">{row.original.name}</span>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
+                        <span className="text-sm font-medium">{row.original.name}</span>
+                        <span className="flex gap-1 items-center text-xs text-muted-foreground">
+                            <Mail className="w-3 h-3" />
                             {row.original.email}
                         </span>
                     </div>
@@ -163,11 +163,11 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
             accessorKey: 'type',
             header: 'Type',
             cell: ({ row }) => (
-                <div className="flex items-center gap-2">
+                <div className="flex gap-2 items-center">
                     {row.original.type !== 'user' && (
-                        <Shield className="h-4 w-4 text-primary" />
+                        <Shield className="w-4 h-4 text-primary" />
                     )}
-                    <span className="text-sm capitalize font-medium">
+                    <span className="text-sm font-medium capitalize">
                         {row.original.type.replace('_', ' ')}
                     </span>
                 </div>
@@ -195,13 +195,13 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                         <Badge
                             key={role.id}
                             variant="secondary"
-                            className="text-xs capitalize px-2 py-0 h-5"
+                            className="px-2 py-0 h-5 text-xs capitalize"
                         >
                             {role.name.replace(/_/g, ' ')}
                         </Badge>
                     ))}
                     {(row.original.roles ?? []).length > 3 && (
-                        <Badge variant="outline" className="text-xs px-2 py-0 h-5">
+                        <Badge variant="outline" className="px-2 py-0 h-5 text-xs">
                             +{(row.original.roles ?? []).length - 3}
                         </Badge>
                     )}
@@ -231,8 +231,8 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                 <div className="flex flex-col items-center">
                     {row.original.email_verified_at ? (
                         <>
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span className="text-xs text-muted-foreground mt-1">
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                            <span className="mt-1 text-xs text-muted-foreground">
                                 {formatDate(row.original.email_verified_at)}
                             </span>
                         </>
@@ -247,8 +247,8 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
             accessorKey: 'created_at',
             header: 'Created',
             cell: ({ row }) => (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
+                <div className="flex gap-2 items-center text-sm text-muted-foreground">
+                    <Calendar className="w-3 h-3" />
                     {formatDate(row.original.created_at)}
                 </div>
             ),
@@ -283,7 +283,7 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Users" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex overflow-x-auto flex-col flex-1 gap-4 p-4 h-full rounded-xl">
                 <PageHeader
                     title="User Management"
                     description="Manage user accounts, permissions, and access levels across the platform"
@@ -291,7 +291,7 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                     actions={
                         <Button asChild className="shadow-sm">
                             <Link href="/users/create">
-                                <Plus className="mr-2 h-4 w-4" />
+                                <Plus className="mr-2 w-4 h-4" />
                                 Add New User
                             </Link>
                         </Button>
@@ -305,33 +305,33 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                         value={stats.total.toLocaleString()}
                         icon={UsersIcon}
                         description="All registered users"
-                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:bg-gradient-to-br dark:from-blue-800 dark:to-blue-900 dark:border-blue-800"
+                        className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:bg-gradient-to-br dark:from-blue-950 dark:to-blue-900 dark:border-blue-800"
                     />
                     <StatsCard
                         title="Active Users"
                         value={stats.active.toLocaleString()}
                         icon={CheckCircle}
                         description="Currently active"
-                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:bg-gradient-to-br dark:from-green-800 dark:to-green-900 dark:border-green-800"
+                        className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:bg-gradient-to-br dark:from-green-950 dark:to-green-900 dark:border-green-800"
                     />
                     <StatsCard
                         title="Administrators"
                         value={stats.admins.toLocaleString()}
                         icon={UserCog}
                         description="Admin & Super Admin"
-                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:bg-gradient-to-br dark:from-purple-800 dark:to-purple-900 dark:border-purple-800"
+                        className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 dark:bg-gradient-to-br dark:from-purple-950 dark:to-purple-900 dark:border-purple-800"
                     />
                     <StatsCard
                         title="Verified"
                         value={stats.verified.toLocaleString()}
                         icon={ShieldCheck}
                         description="Email verified users"
-                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:bg-gradient-to-br dark:from-orange-800 dark:to-orange-900 dark:border-orange-800"
+                        className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 dark:bg-gradient-to-br dark:from-orange-950 dark:to-orange-900 dark:border-orange-800"
                     />
                 </div>
 
                 {/* Data Table Section */}
-                <div className="bg-card rounded-lg border shadow-sm">
+                <div className="rounded-lg border shadow-sm bg-card">
                         <GenericDataTable
                             columns={columns}
                             data={users.data}
@@ -340,17 +340,17 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                             onSearch={handleSearch}
                             searchValue={searchTerm}
                             filters={
-                                <div className="flex items-center gap-2">
+                                <div className="flex gap-2 items-center">
                                     <UserFilters currentFilters={clientFilters} onChange={(f) => setClientFilters(prev => ({ ...prev, ...f }))} />
                                     {selectedRows.length > 0 && (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex gap-2 items-center">
                                             <span className="text-sm text-muted-foreground">
                                                 {selectedRows.length} selected
                                             </span>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="outline" size="sm" className="h-9">
-                                                        <MoreHorizontal className="h-4 w-4 mr-2" />
+                                                        <MoreHorizontal className="mr-2 w-4 h-4" />
                                                         Actions
                                                     </Button>
                                                 </DropdownMenuTrigger>
@@ -358,7 +358,7 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                                                     <DropdownMenuLabel>Bulk Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem onClick={handleBulkDelete} className="text-destructive">
-                                                        <Trash className="mr-2 h-4 w-4" />
+                                                        <Trash className="mr-2 w-4 h-4" />
                                                         Delete Selected
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
@@ -381,10 +381,10 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
 
                 {/* Empty State Handling */}
                 {users.data.length === 0 && !isLoading && (
-                    <div className="text-center py-12">
-                        <UsersIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <div className="py-12 text-center">
+                        <UsersIcon className="mx-auto w-12 h-12 text-muted-foreground" />
                         <h3 className="mt-4 text-lg font-semibold">No users found</h3>
-                        <p className="text-muted-foreground mt-2">
+                        <p className="mt-2 text-muted-foreground">
                             {searchTerm || Object.values(filters).some(Boolean)
                                 ? "Try adjusting your search or filters to find what you're looking for."
                                 : "Get started by creating your first user."
@@ -393,7 +393,7 @@ export default function UsersIndex({ users, filters, stats }: UsersPageProps) {
                         {!searchTerm && !Object.values(filters).some(Boolean) && (
                             <Button asChild className="mt-4">
                                 <Link href="/users/create">
-                                    <Plus className="mr-2 h-4 w-4" />
+                                    <Plus className="mr-2 w-4 h-4" />
                                     Add New User
                                 </Link>
                             </Button>

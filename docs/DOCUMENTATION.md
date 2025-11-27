@@ -1,478 +1,124 @@
-# 📋 Biolink SaaS Documentation
+# SAUS Documentation
 
-## 🎯 Project Overview
-BioLink SaaS platform mirip lynk.id dengan fitur lebih lengkap, built dengan Laravel 12 backend dan Next.js frontend.
+## Overview
+- SAUS adalah platform Link-in-Bio SaaS modern dengan fitur advanced dan siap dikembangkan menuju roadmap di `docs/saus_features_doc.md`.
+- Backend menggunakan Laravel 12 dengan Inertia.js (React) untuk rendering sisi server yang mulus.
+- Database utama PostgreSQL; caching dan queues menggunakan Redis (opsional).
 
-## 🏗️ Architecture
+## Architecture
+- Backend: Laravel 12, Inertia.js, Spatie Permission, Laravel Fortify (auth), Sonner (toast), Shadcn/ui (komponen UI), TailwindCSS.
+- Frontend: React + TypeScript (di `backend/resources/js`), TanStack Table, Inertia router.
+- Observability: Laravel Telescope/Pulse (direncanakan), Horizon (direncanakan), Activity log.
 
-### Tech Stack
-**Backend:**
-- Laravel 12 + Laradashboard
-- MySQL Database
-- Laravel Sanctum (API Authentication)
-- Module-based Architecture
-
-**Frontend:**
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS + Shadcn/ui
-- Zustand (State Management)
-- Axios (HTTP Client)
-
-### Domain Structure
+## Project Structure
 ```
-Backend:  api.biolink-saas.com
-Frontend: biolink-saas.com
-```
-
-## 📁 Project Structure
-
-### Backend Structure
-```
-app/
-├── Modules/
-│   ├── UserManagement/     # From Laradashboard
-│   ├── Settings/          # From Laradashboard
-│   ├── Translation/       # From Laradashboard
-│   ├── BioLinks/
-│   │   ├── Entities/
-│   │   ├── Http/
-│   │   │   ├── Controllers/
-│   │   │   ├── Requests/
-│   │   │   └── Resources/
-│   │   ├── Routes/
-│   │   │   ├── api.php
-│   │   │   └── web.php
-│   │   ├── Database/
-│   │   │   ├── Migrations/
-│   │   │   └── Seeders/
-│   │   └── Services/
-│   ├── ProfilePages/
-│   ├── Analytics/
-│   ├── Templates/
-│   ├── Billing/
-│   ├── FileManager/
-│   └── API/
-```
-
-### Frontend Structure
-```
-frontend/
+backend/
 ├── app/
-│   ├── [username]/
-│   │   └── page.tsx           # Public profile page
-│   ├── dashboard/
-│   │   ├── page.tsx           # Dashboard main
-│   │   ├── links/
-│   │   │   ├── page.tsx       # Links management
-│   │   │   └── [id]/
-│   │   │       └── page.tsx   # Edit link
-│   │   ├── profile/
-│   │   │   └── page.tsx       # Profile customization
-│   │   └── analytics/
-│   │       └── page.tsx       # Analytics dashboard
-│   ├── auth/
-│   │   ├── login/
-│   │   │   └── page.tsx
-│   │   └── register/
-│   │       └── page.tsx
-│   └── api/                   # Frontend API routes
-├── components/
-│   ├── ui/                    # Shadcn/ui components
-│   ├── forms/                 # Form components
-│   ├── layout/                # Layout components
-│   ├── dashboard/             # Dashboard specific
-│   └── public/                # Public profile components
-├── lib/
-│   ├── axios.ts               # Axios configuration
-│   ├── auth.ts                # Authentication utilities
-│   ├── utils.ts               # Utility functions
-│   └── validations.ts         # Form validations
-├── stores/
-│   ├── auth-store.ts          # Authentication store
-│   ├── links-store.ts         # Links management store
-│   └── profile-store.ts       # Profile store
-├── types/
-│   ├── api.ts                 # API response types
-│   ├── auth.ts                # Authentication types
-│   └── components.ts          # Component prop types
-└── hooks/
-    ├── use-auth.ts            # Authentication hook
-    ├── use-links.ts           # Links management hook
-    └── use-analytics.ts       # Analytics hook
+│   └── Http/Controllers/ (Users, Roles, Permissions, Tenants, Themes, Settings)
+├── resources/js/
+│   ├── layouts/app-layout.tsx
+│   ├── components/ (ui, data-table, toolbar, pagination)
+│   └── pages/
+│       ├── users/
+│       ├── roles/
+│       ├── permissions/
+│       ├── tenants/
+│       ├── themes/
+│       └── settings/
+├── database/
+│   ├── migrations/ (roles: label, description; permissions: description)
+│   └── seeders/RoleAndPermissionSeeder.php
+└── routes/web.php (Inertia pages & actions)
 ```
 
-## 🗄️ Database Schema
+## Core Features (Planned & In Progress)
+- AI-Powered Smart Features: smart link optimization, predictive analytics, auto A/B testing.
+- Advanced Analytics Dashboard: real-time analytics, UTM & referrer tracking, device insights.
+- Advanced Page Builder: drag & drop, templates, dynamic blocks, custom styling.
+- Smart Link Management: conditional links (geo/device/time/UTM), QR, short URLs.
+- E-Commerce Integration: marketplace & payment gateways.
+- Marketing Automation: email/SMS/push, lead magnets, segments.
+- Multi-Brand & Team Management: granular RBAC, audit trail, invitations.
+- Security & Privacy: 2FA, rate limiting, backups, GDPR tooling.
+- SEO & Performance: meta/OG, schema, sitemap, CDN, caching.
+- Developer Tools: public API, webhooks, integrations.
+- Mobile & PWA: offline mode, push.
+- Content Management: blog, digital products, membership.
 
-### Core Tables
-```sql
--- Users table (extended from Laradashboard)
-ALTER TABLE users ADD COLUMN (
-    username VARCHAR(100) UNIQUE,
-    subscription_plan ENUM('free', 'pro', 'business') DEFAULT 'free',
-    subscription_ends_at TIMESTAMP NULL,
-    storage_used BIGINT DEFAULT 0
-);
+Detail lengkap fitur dan roadmap: lihat `docs/saus_features_doc.md`.
 
--- Links table
-CREATE TABLE links (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    url VARCHAR(500) NOT NULL,
-    icon VARCHAR(50) NULL,
-    `order` INT DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
-    click_count INT DEFAULT 0,
-    created_at TIMESTAMP NULL,
-    updated_at TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_order (user_id, `order`)
-);
+## Current Implementations
+- User Management: listing, bulk actions, sonner confirmations.
+- Role Management: index/create/edit/show; label & description pada roles; client-side search & selection.
+- Permission Management:
+  - Index dengan client-side filtering, guard filter, bulk delete.
+  - Create/Edit dengan `description`.
+  - Sync canonical permissions dengan deskripsi otomatis.
+  - Manage role permissions (group by module/model, select all).
 
--- User profiles table
-CREATE TABLE user_profiles (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NOT NULL,
-    username VARCHAR(100) UNIQUE NOT NULL,
-    bio TEXT NULL,
-    avatar VARCHAR(500) NULL,
-    template VARCHAR(50) DEFAULT 'default',
-    customization JSON NULL,
-    meta_title VARCHAR(255) NULL,
-    meta_description TEXT NULL,
-    meta_image VARCHAR(500) NULL,
-    created_at TIMESTAMP NULL,
-    updated_at TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+## Routes (Web)
+Beberapa route penting (lihat `backend/routes/web.php` untuk lengkap):
+- Users: `resource('users')`, bulk destroy, status update.
+- Roles: `resource('roles')`, `roles/{role}/permissions`, `roles/{role}/sync-permissions`, bulk destroy.
+- Permissions: `resource('permissions')->except(['show'])`, `permissions/bulk-destroy`, `permissions/sync`.
+- Tenants, Themes, Settings, Activity Log, Backups: masing-masing resource & aksi khusus.
 
--- Analytics table
-CREATE TABLE link_analytics (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    link_id BIGINT UNSIGNED NOT NULL,
-    ip_address VARCHAR(45) NULL,
-    user_agent TEXT NULL,
-    referrer VARCHAR(500) NULL,
-    country VARCHAR(100) NULL,
-    city VARCHAR(100) NULL,
-    device_type ENUM('desktop', 'mobile', 'tablet') NULL,
-    created_at TIMESTAMP NULL,
-    FOREIGN KEY (link_id) REFERENCES links(id) ON DELETE CASCADE,
-    INDEX idx_link_created (link_id, created_at)
-);
-```
+## Database
+- Roles: kolom tambahan `label` (string, nullable) dan `description` (text, nullable).
+- Permissions: kolom `description` (text, nullable); grouping bersifat fleksibel (module/group/prefix nama).
+- Seeder: mengisi permissions dot-style dan backfill `description`; role Super Admin memiliki semua izin.
 
-## 🔌 API Endpoints
+## UI Components
+- GenericDataTable: pencarian, filter, pagination, row click, row selection, toolbar, pagination.
+- Sonner: konfirmasi aksi destruktif (bulk delete, delete), sukses/gagal.
+- Shadcn/ui: tombol, badge, dropdown, kartu, tabel.
 
-### Authentication
-```
-POST   /api/auth/register     # User registration
-POST   /api/auth/login        # User login
-POST   /api/auth/logout       # User logout
-GET    /api/auth/user         # Get current user
-POST   /api/auth/refresh      # Refresh token
-```
-
-### BioLinks Management
-```
-GET    /api/links             # Get user's links
-POST   /api/links             # Create new link
-GET    /api/links/{id}        # Get specific link
-PUT    /api/links/{id}        # Update link
-DELETE /api/links/{id}        # Delete link
-PUT    /api/links/order       # Update links order
-```
-
-### Profile Management
-```
-GET    /api/profile           # Get user profile
-PUT    /api/profile           # Update profile
-GET    /api/profile/{username} # Get public profile (no auth)
-POST   /api/profile/avatar    # Upload avatar
-```
-
-### Analytics
-```
-GET    /api/analytics/overview           # Overview statistics
-GET    /api/analytics/links              # Links analytics
-GET    /api/analytics/geographic         # Geographic data
-GET    /api/analytics/devices            # Device analytics
-```
-
-### Public APIs
-```
-GET    /api/public/profile/{username}    # Public profile data
-POST   /api/public/click/{linkId}        # Track link click
-```
-
-## 🚀 Development Setup
-
-### Backend Setup
+## Development Setup
 ```bash
-# 1. Clone and setup Laravel
-git clone [repository]
-cd biolink-backend
+# Backend
 composer install
-
-# 2. Environment setup
 cp .env.example .env
 php artisan key:generate
-
-# 3. Database setup
-# Configure .env with database credentials
 php artisan migrate
-php artisan db:seed
-
-# 4. Install Laradashboard and modules
-php artisan vendor:publish --tag=laradashboard-assets
-php artisan module:enable BioLinks ProfilePages Analytics
-
-# 5. Serve application
+php artisan db:seed --class=RoleAndPermissionSeeder
 php artisan serve
-```
 
-### Frontend Setup
-```bash
-# 1. Clone frontend
-git clone [frontend-repo]
-cd biolink-frontend
-
-# 2. Install dependencies
+# Frontend (Inertia React berada di resources/js; dibangun dengan Vite)
 npm install
-
-# 3. Environment setup
-cp .env.example .env.local
-# Configure NEXT_PUBLIC_API_URL and other variables
-
-# 4. Run development server
 npm run dev
 ```
 
-### Environment Variables
-
-**Backend (.env):**
+### Environment
 ```env
-APP_NAME=BioLinkSaaS
-APP_ENV=local
-APP_KEY=
 APP_URL=http://localhost:8000
-
-DB_CONNECTION=mysql
+DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=biolink_saas
-DB_USERNAME=root
-DB_PASSWORD=
-
-FRONTEND_URL=http://localhost:3000
-
-STRIPE_KEY=
-STRIPE_SECRET=
+DB_PORT=5432
+DB_DATABASE=saus
+DB_USERNAME=postgres
+DB_PASSWORD=secret
 ```
 
-**Frontend (.env.local):**
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000/api
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
+## Security & Authorization
+- Auth middleware: `auth`, `verified`.
+- RBAC: Spatie Permission, permissions dot-style (mis. `permissions.view`).
+- CSRF: gunakan `router.post` Inertia untuk aksi POST agar token terkelola otomatis.
 
-## 🔒 Security Configuration
+## Roadmap Phases
+- Phase 1 (Foundation): User, Roles & Permissions, Settings, Team, API structure.
+- Phase 2 (Core): Page Builder, Link Management, QR, Basic Analytics, Media Library UI.
+- Phase 3 (Advanced): AI Features, Advanced Analytics, Marketing Automation, E-commerce, Payment.
+- Phase 4 (Scale): Multi-tenancy, White-label, Mobile Apps, API Marketplace, Enterprise.
 
-### CORS Configuration (Backend)
-```php
-// config/cors.php
-return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
-    'allowed_methods' => ['*'],
-    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:3000')],
-    'allowed_headers' => ['*'],
-    'exposed_headers' => [],
-    'max_age' => 0,
-    'supports_credentials' => true,
-];
-```
+## Troubleshooting
+- 419 Page Expired: gunakan `router.post` (Inertia) alih-alih `fetch` manual.
+- Column not found (group/module): controller menggunakan fallback prefix nama permission.
+- Click row membuka detail saat klik actions: table menghentikan propagasi di kolom `select` dan `actions`.
 
-### Rate Limiting
-```php
-// app/Providers/RouteServiceProvider.php
-protected function configureRateLimiting()
-{
-    RateLimiter::for('api', function (Request $request) {
-        return Limit::perMinute(100)->by($request->user()?->id ?: $request->ip());
-    });
-}
-```
+## Testing & Quality
+- Typecheck: `npm run types`
+- Lint: `npm run lint`
+- Laravel tests: `php artisan test` (tambahkan sesuai kebutuhan proyek).
 
-## 📊 Performance Optimization
-
-### Frontend Optimizations
-```typescript
-// Static Generation for public profiles
-export async function generateStaticParams() {
-  return [{ username: 'demo' }];
-}
-
-export async function getStaticProps({ params }: { params: { username: string } }) {
-  const profile = await fetchProfile(params.username);
-  return { props: { profile }, revalidate: 60 };
-}
-```
-
-### Backend Optimizations
-```php
-// Caching strategies
-public function getProfile($username)
-{
-    return Cache::remember("profile.{$username}", 3600, function () use ($username) {
-        return UserProfile::with(['links' => function($query) {
-            $query->where('is_active', true)->orderBy('order');
-        }])->where('username', $username)->firstOrFail();
-    });
-}
-
-// Eager loading
-$user->load(['links' => function($query) {
-    $query->orderBy('order');
-}]);
-```
-
-## 🎨 UI/UX Components
-
-### Core Components Structure
-```typescript
-// components/ui/ (Shadcn/ui based)
-- button.tsx
-- input.tsx
-- card.tsx
-- dialog.tsx
-- dropdown-menu.tsx
-- form.tsx
-- table.tsx
-- tabs.tsx
-
-// components/forms/
-- link-form.tsx
-- profile-form.tsx
-- analytics-filters.tsx
-
-// components/dashboard/
-- stats-cards.tsx
-- links-list.tsx
-- quick-actions.tsx
-
-// components/public/
-- profile-header.tsx
-- links-grid.tsx
-- social-icons.tsx
-```
-
-## 📈 Deployment
-
-### Backend Deployment (VPS)
-```bash
-# Server requirements
-- PHP 8.2+
-- MySQL 8.0+
-- Redis (optional)
-- Supervisor (for queues)
-
-# Deployment steps
-1. Clone repository
-2. Composer install --no-dev
-3. Setup environment variables
-4. Run migrations
-5. Configure web server (Nginx/Apache)
-6. Setup SSL certificate
-```
-
-### Frontend Deployment (Vercel)
-```bash
-# Vercel configuration
-1. Connect GitHub repository
-2. Configure environment variables
-3. Deploy automatically on push
-
-# vercel.json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "devCommand": "npm run dev",
-  "cleanUrls": true
-}
-```
-
-## 🔄 Development Workflow
-
-### Feature Development Process
-1. **Database Migration** → 2. **Backend Module** → 3. **API Routes** → 4. **Frontend Integration** → 5. **Testing**
-
-### Git Branch Strategy
-```
-main          → Production ready
-develop       → Development branch
-feature/*     → New features
-bugfix/*      → Bug fixes
-release/*     → Release preparation
-```
-
-## 🧪 Testing
-
-### Backend Tests
-```bash
-# Run tests
-php artisan test
-
-# Test structure
-tests/
-├── Feature/
-│   ├── AuthTest.php
-│   ├── LinksTest.php
-│   └── ProfileTest.php
-└── Unit/
-    └── Services/
-        └── LinkServiceTest.php
-```
-
-### Frontend Tests
-```bash
-# Run tests
-npm run test
-
-# Test structure
-__tests__/
-├── components/
-├── pages/
-└── utils/
-```
-
-## 📝 API Documentation
-
-API documentation will be auto-generated using Laravel API Documentation Generator and available at `/api/documentation`.
-
-## 🚨 Troubleshooting
-
-### Common Issues
-1. **CORS Errors** - Check FRONTEND_URL in .env
-2. **Authentication Issues** - Verify Sanctum configuration
-3. **Module Not Found** - Run `php artisan module:enable [module]`
-4. **Static Generation Fails** - Check API endpoint accessibility
-
-### Debug Mode
-```env
-APP_DEBUG=true
-LOG_LEVEL=debug
-```
-
-## 📞 Support
-
-For development support:
-- Backend Issues: Check Laravel logs in `storage/logs/`
-- Frontend Issues: Check browser console and network tab
-- Database Issues: Check query logs and migrations
-
----
-
-**Last Updated:** ${new Date().toLocaleDateString()}
-
-**Maintainer:** achmadjp
+## Maintainer
+- achmadjp

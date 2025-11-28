@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Head, useForm, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,21 +11,19 @@ import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { 
-    Settings2, 
-    Save, 
-    RotateCcw, 
-    Search, 
-    Plus, 
-    Trash2, 
-    CheckCircle2, 
-    Mail, 
-    Shield, 
-    Palette, 
-    Users, 
-    Code, 
+import {
+    Settings2,
+    Save,
+    RotateCcw,
+    Search,
+    Trash2,
+    CheckCircle2,
+    Mail,
+    Shield,
+    Palette,
+    Users,
+    Code,
     Zap,
     Database,
     Globe,
@@ -52,9 +50,6 @@ interface SettingsPageProps {
     groups: {
         [key: string]: string;
     };
-    fieldTypes?: {
-        [key: string]: string;
-    };
 }
 
 type SettingsPrimitive = string | number | boolean | null;
@@ -62,12 +57,12 @@ type SettingsMap = Record<string, SettingsPrimitive>;
 type SettingsFormData = { settings: SettingsMap };
 type SettingItem = SettingsPageProps['settings'][string][number];
 
-export default function SettingsIndex({ settings, groups, fieldTypes = {} }: SettingsPageProps) {
+export default function SettingsIndex({ settings, groups }: SettingsPageProps) {
     const [activeTab, setActiveTab] = useState('general');
     const [uploading, setUploading] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [showChangedOnly, setShowChangedOnly] = useState(false);
-    const [showAddSetting, setShowAddSetting] = useState(false);
+
     const [testingMail, setTestingMail] = useState(false);
     const [testEmail, setTestEmail] = useState('');
 
@@ -82,13 +77,7 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
         settings: initialValues,
     });
 
-    const addSettingForm = useForm({
-        key: '',
-        value: '',
-        type: 'string',
-        group: 'custom',
-        description: '',
-    });
+
 
     const isDirty = useMemo(() => {
         try {
@@ -205,20 +194,7 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
         }
     };
 
-    const handleAddSetting = () => {
-        addSettingForm.post('/settings', {
-            preserveScroll: true,
-            onSuccess: () => {
-                setShowAddSetting(false);
-                addSettingForm.reset();
-                toast.success('Custom setting added successfully!');
-                router.reload();
-            },
-            onError: () => {
-                toast.error('Failed to add custom setting.');
-            },
-        });
-    };
+
 
     const handleDeleteSetting = (key: string) => {
         if (confirm('Are you sure you want to delete this setting?')) {
@@ -239,7 +215,7 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
         }
 
         setTestingMail(true);
-        
+
         try {
             const response = await fetch('/settings/test-mail', {
                 method: 'POST',
@@ -257,7 +233,7 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
             } else {
                 toast.error(`Failed to send test email: ${result.message}`);
             }
-        } catch (error) {
+        } catch {
             toast.error('Failed to send test email. Please check your configuration.');
         } finally {
             setTestingMail(false);
@@ -354,20 +330,6 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
     };
 
     const renderSettingsContent = (groupKey: string, groupLabel: string) => {
-        const GroupIcon = () => {
-            switch(groupKey) {
-                case 'general': return Settings2;
-                case 'mail': return Mail;
-                case 'security': return Shield;
-                case 'appearance': return Palette;
-                case 'users': return Users;
-                case 'api': return Code;
-                case 'advanced': return Zap;
-                case 'database': return Database;
-                default: return Globe;
-            }
-        };
-        const Icon = GroupIcon();
 
         return (
             <Card className="border-2 shadow-lg">
@@ -437,7 +399,7 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
                                                 <SelectContent>
                                                     {Object.entries({
                                                         string: 'Text',
-                                                        text: 'Text Area', 
+                                                        text: 'Text Area',
                                                         boolean: 'Yes/No',
                                                         integer: 'Number',
                                                         json: 'JSON',
@@ -504,11 +466,11 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
                             return changedKeys.has(s.key);
                         })
                         .map((setting) => (
-                            <div 
-                                key={setting.key} 
+                            <div
+                                key={setting.key}
                                 className={`grid grid-cols-1 md:grid-cols-3 gap-6 items-start p-4 rounded-lg border transition-all hover:shadow-md ${
-                                    changedKeys.has(setting.key) 
-                                        ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900' 
+                                    changedKeys.has(setting.key)
+                                        ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900'
                                         : 'bg-card hover:bg-muted/30'
                                 }`}
                             >
@@ -725,8 +687,8 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
                                     key={key}
                                     onClick={() => setActiveTab(key)}
                                     className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                                        isActive 
-                                            ? 'bg-primary text-primary-foreground shadow-sm' 
+                                        isActive
+                                            ? 'bg-primary text-primary-foreground shadow-sm'
                                             : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                                     }`}
                                 >
@@ -735,7 +697,7 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
                                         <span>{label}</span>
                                     </div>
                                     {count > 0 && (
-                                        <Badge 
+                                        <Badge
                                             variant={isActive ? "secondary" : "destructive"}
                                             className="h-5 min-w-5 px-1.5 text-xs font-semibold"
                                         >
@@ -762,7 +724,7 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
                                         Configure {groups[activeTab].toLowerCase()} settings for your application
                                     </p>
                                 </div>
-                                
+
                                 {/* Action Buttons Group */}
                                 <div className="flex flex-wrap items-center gap-3">
                                     {/* Search and Filter Group */}
@@ -778,10 +740,10 @@ export default function SettingsIndex({ settings, groups, fieldTypes = {} }: Set
                                         </div>
                                         <div className="h-6 w-px bg-border" />
                                         <div className="flex items-center gap-2 px-2">
-                                            <Checkbox 
-                                                id="changed-only" 
-                                                checked={showChangedOnly} 
-                                                onCheckedChange={(v) => setShowChangedOnly(Boolean(v))} 
+                                            <Checkbox
+                                                id="changed-only"
+                                                checked={showChangedOnly}
+                                                onCheckedChange={(v) => setShowChangedOnly(Boolean(v))}
                                             />
                                             <Label htmlFor="changed-only" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
                                                 <Filter className="h-3.5 w-3.5" />

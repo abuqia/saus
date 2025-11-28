@@ -8,6 +8,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\ThemeController;
+use App\Http\Controllers\PageBlockController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -84,6 +85,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('tenants/{tenant}/verify-domain', [TenantController::class, 'verifyDomain'])->name('tenants.verify-domain');
     Route::post('tenants/{tenant}/suspend', [TenantController::class, 'suspend'])->name('tenants.suspend');
     Route::post('tenants/{tenant}/activate', [TenantController::class, 'activate'])->name('tenants.activate');
+    Route::post('tenants/{tenant}/apply-theme/{theme}', [TenantController::class, 'applyTheme'])->name('tenants.apply-theme');
+    Route::post('tenants/{tenant}/themes/{theme}/toggle', [TenantController::class, 'toggleTenantTheme'])->name('tenants.themes.toggle');
+    Route::delete('tenants/{tenant}/themes/{theme}', [TenantController::class, 'detachTenantTheme'])->name('tenants.themes.detach');
 
     // ============================================
     // THEME MANAGEMENT
@@ -91,6 +95,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('themes', ThemeController::class);
     Route::post('themes/{theme}/duplicate', [ThemeController::class, 'duplicate'])->name('themes.duplicate');
     Route::post('themes/{theme}/toggle-featured', [ThemeController::class, 'toggleFeatured'])->name('themes.toggle-featured');
+
+    // ============================================
+    // PAGES
+    // ============================================
+    Route::resource('pages', PageController::class);
+    Route::post('pages/{page}/publish', [PageController::class, 'publish'])->name('pages.publish');
+    Route::get('pages/{page}/preview', [PageController::class, 'preview'])->name('pages.preview');
+    Route::post('pages/{page}/blocks', [PageBlockController::class, 'store'])->name('pages.blocks.store');
+    Route::put('pages/{page}/blocks/{block}', [PageBlockController::class, 'update'])->name('pages.blocks.update');
+    Route::delete('pages/{page}/blocks/{block}', [PageBlockController::class, 'destroy'])->name('pages.blocks.destroy');
+    Route::post('pages/{page}/blocks/reorder', [PageBlockController::class, 'reorder'])->name('pages.blocks.reorder');
 
     // ============================================
     // SETTINGS

@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use App\Models\Tenant;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -38,6 +39,16 @@ class HandleInertiaRequests extends Middleware
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
+        $tenant = null;
+        $host = $request->getHost();
+        if (!empty($host)) {
+            $tenant = Tenant::byDomain($host)->first();
+        }
+
+        if (!$tenant && $request->has('tenant_id')) {
+            $tenant = Tenant::find((int) $request->input('tenant_id'));
+        }
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -45,6 +56,13 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'tenant' => $tenant ? [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'slug' => $tenant->slug,
+                'domain' => $tenant->domain,
+                'is_active' => $tenant->is_active,
+            ] : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

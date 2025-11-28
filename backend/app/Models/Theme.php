@@ -36,4 +36,16 @@ class Theme extends Model
     {
         return $query->where('is_default', true);
     }
+
+    public function tenants()
+    {
+        return $this->belongsToMany(Tenant::class, 'tenant_themes')
+            ->withPivot(['is_active', 'variables'])
+            ->withTimestamps();
+    }
+
+    public function incrementUsage(): void
+    {
+        $this->increment('usage_count');
+    }
 }

@@ -44,6 +44,18 @@ class Tenant extends Model
             ->withTimestamps();
     }
 
+    public function themes(): BelongsToMany
+    {
+        return $this->belongsToMany(Theme::class, 'tenant_themes')
+            ->withPivot(['is_active', 'variables'])
+            ->withTimestamps();
+    }
+
+    public function pages(): HasMany
+    {
+        return $this->hasMany(Page::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

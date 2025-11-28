@@ -25,7 +25,8 @@ class DatabaseSeeder extends Seeder
             DemoUsersSeeder::class,
             TenantsSeeder::class,
             SettingsSeeder::class,
-            // ThemesSeeder::class,
+            PagesSeeder::class,
+            ThemesSeeder::class,
         ]);
     }
 }

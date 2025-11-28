@@ -22,12 +22,8 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         setIsLoading(true);
 
         try {
-            // Method 1: Direct redirect (simple)
-            // Full-page redirect to avoid CORS/XHR issues
-            // window.location.assign('/auth/google');
-
-            // Method 2: Popup window (better UX)
-            await handlePopupLogin();
+            // await handlePopupLogin();
+            window.location.assign('/auth/google')
         } catch (error) {
             console.error('Google login error:', error);
             setIsLoading(false);
@@ -42,7 +38,7 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         const top = (window.screen.height - height) / 2;
 
         const popup = window.open(
-            '/auth/google',
+            '',
             'google_auth',
             `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
         );
@@ -53,7 +49,10 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
             return;
         }
 
-        // Listen for message dari popup
+        const res = await fetch('/auth/google/popup');
+        const data = await res.json();
+        if (popup) popup.location.href = data.url;
+
         const messageHandler = (event: MessageEvent) => {
             if (event.origin !== window.location.origin) return;
 
@@ -71,15 +70,6 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
         };
 
         window.addEventListener('message', messageHandler);
-
-        // Check jika popup closed oleh user
-        const checkPopup = setInterval(() => {
-            if (popup.closed) {
-                clearInterval(checkPopup);
-                setIsLoading(false);
-                window.removeEventListener('message', messageHandler);
-            }
-        }, 500);
     };
 
     const sizeClasses = {

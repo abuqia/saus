@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 
 /**
  * System Settings Model (Global)
@@ -15,112 +16,141 @@ class Setting extends Model
     use HasFactory;
 
     protected $fillable = [
-        'group',
         'key',
         'value',
         'type',
+        'group',
         'description',
-        'is_public',
+        'options',
         'order',
+        'is_public',
+        'is_encrypted',
+        'is_editable',
+        'is_deletable',
+        'validation_rules',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'is_public' => 'boolean',
-            'order' => 'integer',
-        ];
-    }
+    protected $casts = [
+        'options' => 'array',
+        'is_public' => 'boolean',
+        'is_encrypted' => 'boolean',
+        'is_editable' => 'boolean',
+        'is_deletable' => 'boolean',
+        'order' => 'integer',
+    ];
 
     /**
-     * Get casted value based on type
+     * Accessor untuk decrypt value jika diperlukan
      */
     public function getValueAttribute($value)
     {
-        return match($this->type) {
-            'boolean' => (bool) $value,
-            'integer' => (int) $value,
-            'float' => (float) $value,
-            'json', 'array' => json_decode($value, true),
-            default => $value,
-        };
+        if ($this->is_encrypted && !empty($value)) {
+            try {
+                return Crypt::decryptString($value);
+            } catch (\Exception $e) {
+                return $value;
+            }
+        }
+
+        return $this->castValue($value);
     }
 
     /**
-     * Set value based on type
+     * Mutator untuk encrypt value jika diperlukan
      */
     public function setValueAttribute($value)
     {
-        $this->attributes['value'] = match($this->type) {
-            'boolean' => $value ? '1' : '0',
-            'json', 'array' => json_encode($value),
+        if ($this->is_encrypted && !empty($value)) {
+            $value = Crypt::encryptString($value);
+        }
+
+        $this->attributes['value'] = $value;
+    }
+
+    /**
+     * Cast value berdasarkan type
+     */
+    protected function castValue($value)
+    {
+        if (is_null($value)) {
+            return null;
+        }
+
+        return match ($this->type) {
+            'boolean' => (bool) $value,
+            'integer' => (int) $value,
+            'json' => json_decode($value, true) ?? $value,
             default => $value,
         };
     }
 
     /**
-     * Scopes
+     * Scope untuk group tertentu
      */
-    public function scopeGroup($query, string $group)
+    public function scopeGroup($query, $group)
     {
         return $query->where('group', $group);
     }
 
+    /**
+     * Scope untuk public settings
+     */
     public function scopePublic($query)
     {
         return $query->where('is_public', true);
     }
 
-    public function scopeOrdered($query)
+    /**
+     * Scope untuk editable settings
+     */
+    public function scopeEditable($query)
     {
-        return $query->orderBy('order')->orderBy('key');
+        return $query->where('is_editable', true);
     }
 
     /**
-     * Helper Methods
+     * Get setting value by key
      */
-    public static function get(string $key, $default = null)
+    public static function getValue($key, $default = null)
     {
-        return Cache::rememberForever("setting.{$key}", function () use ($key, $default) {
-            $setting = static::where('key', $key)->first();
-            return $setting ? $setting->value : $default;
-        });
+        $setting = static::where('key', $key)->first();
+        
+        if ($setting) {
+            return $setting->value;
+        }
+
+        return $default;
     }
 
-    public static function set(string $key, $value, ?string $group = null, ?string $type = null): void
+    /**
+     * Set setting value
+     */
+    public static function setValue($key, $value, $type = 'string', $group = 'general'): void
     {
-        $setting = static::updateOrCreate(
-            ['key' => $key],
-            [
-                'value' => $value,
-                'group' => $group ?? 'general',
-                'type' => $type ?? 'string',
-            ]
-        );
-
-        Cache::forget("setting.{$key}");
+        $setting = static::firstOrNew(['key' => $key]);
+        
+        $setting->fill([
+            'value' => $value,
+            'type' => $type,
+            'group' => $group,
+        ])->save();
     }
 
-    public static function forget(string $key): void
+    /**
+     * Create new custom setting
+     */
+    public static function createCustom($data)
     {
-        static::where('key', $key)->delete();
-        Cache::forget("setting.{$key}");
-    }
-
-    public static function getGroup(string $group): array
-    {
-        return Cache::rememberForever("settings.group.{$group}", function () use ($group) {
-            return static::where('group', $group)
-                ->ordered()
-                ->get()
-                ->pluck('value', 'key')
-                ->toArray();
-        });
-    }
-
-    public static function flushCache(): void
-    {
-        Cache::flush();
+        return static::create([
+            'key' => $data['key'],
+            'value' => $data['value'] ?? null,
+            'type' => $data['type'] ?? 'string',
+            'group' => $data['group'] ?? 'custom',
+            'description' => $data['description'] ?? null,
+            'is_editable' => true,
+            'is_deletable' => true,
+            'order' => $data['order'] ?? 999,
+        ]);
     }
 }
 

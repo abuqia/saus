@@ -64,6 +64,10 @@ class SocialAuthController extends Controller
                 $this->createDefaultTenant($user);
             }
 
+            if (!$user->hasVerifiedEmail()) {
+                $user->markEmailAsVerified();
+            }
+
             // Login user
             Auth::login($user, true);
 
@@ -86,6 +90,7 @@ class SocialAuthController extends Controller
     public function getGoogleAuthUrl()
     {
         $url = Socialite::driver('google')
+            ->redirectUrl(url('/auth/google/callback'))
             ->redirect()
             ->getTargetUrl();
 
@@ -137,6 +142,10 @@ class SocialAuthController extends Controller
                 $this->createDefaultTenant($user);
             }
 
+            if (!$user->hasVerifiedEmail()) {
+                $user->markEmailAsVerified();
+            }
+
             // Login user
             Auth::login($user, true);
             $user->recordLogin(request()->ip());
@@ -148,7 +157,7 @@ class SocialAuthController extends Controller
                 <head>
                     <title>Authentication Successful</title>
                     <script>
-                        if (window.opener && !window.opener.closed) {
+                        if (window.opener) {
                             window.opener.postMessage({
                                 type: 'GOOGLE_AUTH_SUCCESS',
                                 user: {
@@ -178,7 +187,7 @@ class SocialAuthController extends Controller
                 <head>
                     <title>Authentication Failed</title>
                     <script>
-                        if (window.opener && !window.opener.closed) {
+                        if (window.opener) {
                             window.opener.postMessage({
                                 type: 'GOOGLE_AUTH_ERROR',
                                 error: 'Failed to authenticate with Google'
@@ -259,7 +268,12 @@ class SocialAuthController extends Controller
                 'google_refresh_token' => $googleUser->refreshToken,
                 'google_expires_in' => now()->addSeconds($googleUser->expiresIn),
                 'avatar' => $googleUser->getAvatar() ?? $user->avatar,
+                'email_verified_at' => $user->email_verified_at ?? now(),
             ]);
+
+            if (!$user->hasVerifiedEmail()) {
+                $user->markEmailAsVerified();
+            }
 
             return redirect('/settings')->with('success', 'Google account connected successfully!');
 

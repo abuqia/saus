@@ -1,14 +1,14 @@
 <?php
 
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\BackupController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\RoleController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\ThemeController;
-use App\Http\Controllers\Auth\SocialAuthController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Lab404\Impersonate\Controllers\ImpersonateController;
@@ -95,8 +95,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ============================================
     // SETTINGS
     // ============================================
-    Route::get('settings', [SettingController::class, 'index'])->name('settings');
+    Route::get('settings', [SettingController::class, 'index'])->name('settings.index');
     Route::put('settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::put('settings/{group}', [SettingController::class, 'updateGroup'])->name('settings.group.update');
+    Route::post('settings', [SettingController::class, 'store'])->name('settings.store');
+    Route::delete('settings/{key}', [SettingController::class, 'destroy'])->name('settings.destroy');
+    Route::post('settings/upload', [SettingController::class, 'upload'])->name('settings.upload');
+    Route::post('settings/test-mail', [SettingController::class, 'testMail'])->name('settings.test-mail');
+    Route::post('settings/apply-config', [SettingController::class, 'applyConfig'])->name('settings.apply-config');
+    Route::post('settings/{key}/reset', [SettingController::class, 'reset'])->name('settings.reset');
+
+    // Public API untuk settings
+    Route::get('api/settings/public', [SettingController::class, 'public'])->name('settings.public');
     Route::post('settings/clear-cache', [SettingController::class, 'clearCache'])->name('settings.clear-cache');
 
     // ============================================
